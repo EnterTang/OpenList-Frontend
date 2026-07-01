@@ -3,12 +3,15 @@ import {
   FormControl,
   FormHelperText,
   FormLabel,
+  HStack,
   Input,
+  Radio,
+  RadioGroup,
   Select,
   Switch as HopeSwitch,
   Textarea,
 } from "@hope-ui/solid"
-import { Match, Show, Switch } from "solid-js"
+import { For, Match, Show, Switch } from "solid-js"
 import type { Accessor } from "solid-js"
 import { useT } from "~/hooks"
 import { DriverItem, Type } from "~/types"
@@ -19,39 +22,30 @@ export type ItemProps = DriverItem & {
   full_name_path?: string
   options_prefix?: string
   driver?: string
-} & (
-    | {
-        type: Type.Bool
-        onChange?: (value: boolean) => void
-        value: boolean | Accessor<boolean>
-      }
-    | {
-        type: Type.Number
-        onChange?: (value: number) => void
-        value: number | Accessor<number>
-      }
-    | {
-        type: Type.Float
-        onChange?: (value: number) => void
-        value: number | Accessor<number>
-      }
-    | {
-        type: Type.String | Type.Text
-        onChange?: (value: string) => void
-        value: string | Accessor<string>
-      }
-    | {
-        type: Type.Select
-        searchable?: boolean
-        onChange?: (value: string) => void
-        value: string | Accessor<string>
-      }
-  )
+  searchable?: boolean
+  onChange?: (value: any) => void
+  value: boolean | number | string | Accessor<boolean | number | string>
+}
 
 const Item = (props: ItemProps) => {
   const t = useT()
   const getVal = <T,>(v: T | Accessor<T>) =>
     (typeof v === "function" ? (v as Accessor<T>)() : v) as T
+  const labelKey = () =>
+    (props.full_name_path ?? props.driver === "common")
+      ? `storages.common.${props.name}`
+      : `drivers.${props.driver}.${props.name}`
+  const tipsKey = () =>
+    props.driver === "common"
+      ? `storages.common.${props.name}-tips`
+      : `drivers.${props.driver}.${props.name}-tips`
+  const optionLabel = (key: string) =>
+    t(
+      (props.options_prefix ??
+        (props.driver === "common"
+          ? `storages.common.${props.name}s`
+          : `drivers.${props.driver}.${props.name}s`)) + `.${key}`,
+    )
   return (
     <FormControl
       w="$full"
@@ -60,11 +54,7 @@ const Item = (props: ItemProps) => {
       required={props.required}
     >
       <FormLabel for={props.name} display="flex" alignItems="center">
-        {t(
-          (props.full_name_path ?? props.driver === "common")
-            ? `storages.common.${props.name}`
-            : `drivers.${props.driver}.${props.name}`,
-        )}
+        {t(labelKey(), undefined, props.label)}
       </FormLabel>
       <Switch fallback={<Center>{t("settings.unknown_type")}</Center>}>
         <Match when={props.type === Type.String}>
@@ -146,25 +136,35 @@ const Item = (props: ItemProps) => {
               searchable={props.type === Type.Select && props.searchable}
               options={props.options.split(",").map((key) => ({
                 key,
-                label: t(
-                  (props.options_prefix ??
-                    (props.driver === "common"
-                      ? `storages.common.${props.name}s`
-                      : `drivers.${props.driver}.${props.name}s`)) + `.${key}`,
-                ),
+                label: optionLabel(key),
               }))}
             />
           </Select>
         </Match>
+        <Match when={props.type === Type.Radio}>
+          <RadioGroup
+            id={props.name}
+            value={getVal(props.value as string | Accessor<string>)}
+            onChange={
+              props.type === Type.Radio
+                ? (value: string) => props.onChange?.(value)
+                : undefined
+            }
+          >
+            <HStack spacing="$4" wrap="wrap">
+              <For each={props.options.split(",")}>
+                {(key) => (
+                  <Radio value={key} disabled={props.readonly}>
+                    {optionLabel(key)}
+                  </Radio>
+                )}
+              </For>
+            </HStack>
+          </RadioGroup>
+        </Match>
       </Switch>
       <Show when={props.help}>
-        <FormHelperText>
-          {t(
-            props.driver === "common"
-              ? `storages.common.${props.name}-tips`
-              : `drivers.${props.driver}.${props.name}-tips`,
-          )}
-        </FormHelperText>
+        <FormHelperText>{t(tipsKey(), undefined, props.help)}</FormHelperText>
       </Show>
     </FormControl>
   )

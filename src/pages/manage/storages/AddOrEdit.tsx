@@ -55,6 +55,24 @@ function GetDefaultValue(type: Type, value?: string) {
 
 type Drivers = Record<string, DriverInfo>
 
+function matchVisibleWhen(
+  visibleWhen: string | undefined,
+  getValue: (name: string) => unknown,
+) {
+  if (!visibleWhen) return true
+  return visibleWhen
+    .split(/[;,]/)
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .every((condition) => {
+      const match = condition.match(/^([A-Za-z0-9_.-]+)\s*(!=|=)\s*(.+)$/)
+      if (!match) return true
+      const [, name, operator, expected] = match
+      const actual = String(getValue(name) ?? "")
+      return operator === "=" ? actual === expected : actual !== expected
+    })
+}
+
 const AddOrEdit = () => {
   const t = useT()
   const { params, back, to } = useRouter()
@@ -96,6 +114,35 @@ const AddOrEdit = () => {
   }
   const [storage, setStorage] = createStore<Storage>({} as Storage)
   const [addition, setAddition] = createStore<Addition>({})
+  const additionValue = (item: DriverItem) => {
+    const value = addition[item.name]
+    if (value !== undefined) return value
+    if (item.name === "auth_mode") {
+      const hasCookie = Boolean(addition.cookie_header)
+      const hasOpenListAuth = Boolean(
+        addition.authorization ||
+        addition.username ||
+        addition.password ||
+        addition.mail_cookies,
+      )
+      if (!hasCookie && hasOpenListAuth) {
+        return "openlist"
+      }
+    }
+    return GetDefaultValue(item.type, item.default)
+  }
+  const visibleAdditionalItems = createMemo(() => {
+    const info = drivers()[storage.driver]
+    if (!info) return []
+    return info.additional.filter((item) =>
+      matchVisibleWhen(item.visible_when, (name) => {
+        const target = info.additional.find(
+          (candidate) => candidate.name === name,
+        )
+        return target ? additionValue(target) : addition[name]
+      }),
+    )
+  })
   const [okLoading, ok] = useFetch((): PResp<{ id: number }> => {
     setStorage("addition", JSON.stringify(addition))
     return r.post(`/admin/storage/${id ? "update" : "create"}`, storage)
@@ -172,12 +219,12 @@ const AddOrEdit = () => {
               />
             )}
           </For>
-          <For each={drivers()[storage.driver].additional}>
+          <For each={visibleAdditionalItems()}>
             {(item) => (
               <Item
                 {...item}
                 driver={storage.driver}
-                value={addition[item.name] as any}
+                value={additionValue(item) as any}
                 onChange={(val: any) => {
                   setAddition(item.name, val)
                 }}

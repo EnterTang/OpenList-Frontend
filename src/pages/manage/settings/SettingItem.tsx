@@ -23,6 +23,8 @@ import { useT } from "~/hooks"
 import { Flag, SettingItem, Type } from "~/types"
 import { TiDelete } from "solid-icons/ti"
 
+const LARGE_TEXT_SETTING_KEYS = new Set(["media_category_rules"])
+
 export type ItemProps = SettingItem & {
   onChange?: (value: string) => void
   onDelete?: () => void
@@ -32,8 +34,15 @@ export type ItemProps = SettingItem & {
 
 const Item = (props: ItemProps) => {
   const t = useT()
+  const isLargeTextSetting = () =>
+    props.type === Type.Text && LARGE_TEXT_SETTING_KEYS.has(props.key)
   return (
-    <FormControl w={props.w ?? "100%"} display="flex" flexDirection="column">
+    <FormControl
+      w={props.w ?? "100%"}
+      display="flex"
+      flexDirection="column"
+      gridColumn={isLargeTextSetting() ? "1 / -1" : undefined}
+    >
       <Show when={!props.hideLabel}>
         <FormLabel for={props.key} display="flex" alignItems="center">
           {t(`settings.${props.key}`)}
@@ -76,6 +85,12 @@ const Item = (props: ItemProps) => {
           <Textarea
             id={props.key}
             value={props.value}
+            rows={isLargeTextSetting() ? 24 : undefined}
+            minH={isLargeTextSetting() ? "420px" : undefined}
+            fontFamily={isLargeTextSetting() ? "monospace" : undefined}
+            fontSize={isLargeTextSetting() ? "$sm" : undefined}
+            lineHeight={isLargeTextSetting() ? "$6" : undefined}
+            spellcheck={isLargeTextSetting() ? false : undefined}
             onChange={(e) => props.onChange?.(e.currentTarget.value)}
             readOnly={props.flag === Flag.READONLY}
           />

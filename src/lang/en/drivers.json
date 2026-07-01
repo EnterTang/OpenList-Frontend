@@ -109,8 +109,14 @@
     "sharepassword": "Sharepassword"
   },
   "139Yun": {
+    "auth_mode": "Auth mode",
+    "auth_modes": {
+      "etf": "ETF auth mode",
+      "openlist": "OpenList default mode"
+    },
     "authorization": "Authorization",
     "cloud_id": "Cloud id",
+    "cookie_header": "Cookie Header",
     "custom_upload_part_size": "Custom upload part size",
     "custom_upload_part_size-tips": "0 for auto",
     "mail_cookies": "Mail cookies",

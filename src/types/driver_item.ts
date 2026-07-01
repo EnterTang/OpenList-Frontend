@@ -2,11 +2,15 @@ import { Type } from "."
 
 export interface DriverItem {
   name: string
+  label?: string
   type: Type
   default: string
   options: string
   required?: boolean
   help?: string
+  group?: string
+  collapsed?: boolean
+  visible_when?: string
 }
 
 export interface DriverConfig {

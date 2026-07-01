@@ -23,14 +23,7 @@ export const SwitchLanguage = <C extends ElementType = "button">(
   const switchLang = async (lang: Lang) => {
     setCurrentLang(lang)
     localStorage.setItem("lang", lang)
-  }
-
-  if (!localStorage.getItem("lang")) {
-    switchLang(
-      languages.find((l) => l.code === navigator.language)
-        ? navigator.language
-        : "en",
-    )
+    localStorage.setItem("lang:explicit", "true")
   }
 
   return (

@@ -15,17 +15,25 @@ export const languages = Object.keys(langs).map((langPath) => {
   return { code: langCode, lang: langName }
 })
 
-// determine browser's default language
+const preferredLang = "zh-CN"
 const userLang = navigator.language.toLowerCase()
-const defaultLang =
+const browserLang =
   languages.find((lang) => lang.code.toLowerCase() === userLang)?.code ||
   languages.find(
     (lang) => lang.code.toLowerCase().split("-")[0] === userLang.split("-")[0],
-  )?.code ||
+  )?.code
+const defaultLang =
+  languages.find((lang) => lang.code === preferredLang)?.code ||
+  browserLang ||
   "en"
 
 // Get initial language from localStorage or fallback to defaultLang
-export let initialLang = localStorage.getItem("lang") ?? defaultLang
+const storedLang = localStorage.getItem("lang")
+const explicitlySelectedLang = localStorage.getItem("lang:explicit") === "true"
+export let initialLang =
+  storedLang && (explicitlySelectedLang || storedLang !== "en")
+    ? storedLang
+    : defaultLang
 
 if (!languages.some((lang) => lang.code === initialLang)) {
   initialLang = defaultLang
