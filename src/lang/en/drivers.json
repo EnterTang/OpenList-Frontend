@@ -110,21 +110,23 @@
   },
   "139Yun": {
     "auth_mode": "Auth mode",
+    "auth_mode-tips": "ETF auth mode only requires Cookie Header. OpenList default mode uses authorization, username, password, and mail cookies.",
     "auth_modes": {
       "etf": "ETF auth mode",
       "openlist": "OpenList default mode"
     },
     "authorization": "Authorization",
-    "cloud_id": "Cloud id",
+    "cloud_id": "Cloud ID",
     "cookie_header": "Cookie Header",
+    "cookie_header-tips": "Copy the full Cookie from yun.139.com web. ETF auth mode extracts auth_token, authorization, account, and ud_id from it, then refreshes automatically.",
     "custom_upload_part_size": "Custom upload part size",
-    "custom_upload_part_size-tips": "0 for auto",
+    "custom_upload_part_size-tips": "0 means automatic.",
     "mail_cookies": "Mail cookies",
-    "mail_cookies-tips": "Cookies from mail.139.com used for login authentication.",
+    "mail_cookies-tips": "Cookie from mail.139.com, used by password login to obtain China Mobile cloud authorization.",
     "password": "Password",
     "report_real_size": "Report real size",
-    "report_real_size-tips": "Enable to report the real file size during upload",
-    "root_folder_id": "Root folder id",
+    "report_real_size-tips": "Report the real file size when uploading.",
+    "root_folder_id": "Root folder ID",
     "type": "Type",
     "types": {
       "family": "Family",
@@ -133,9 +135,9 @@
       "personal_new": "Personal new"
     },
     "use_large_thumbnail": "Use large thumbnail",
-    "use_large_thumbnail-tips": "Enable to use large thumbnail for images",
-    "user_domain_id": "User domain id",
-    "user_domain_id-tips": "ud_id in Cookie, fill in to show disk usage",
+    "use_large_thumbnail-tips": "Use large thumbnails for images.",
+    "user_domain_id": "User domain ID",
+    "user_domain_id-tips": "The ud_id from Cookie. Capacity information can be shown after it is filled.",
     "username": "Username"
   },
   "189Cloud": {

@@ -1,0 +1,21 @@
+{
+  "keyword": "名称关键字",
+  "filter": "筛选",
+  "all": "全部",
+  "matched": "已匹配",
+  "unmatched": "未匹配",
+  "source_name": "源名称",
+  "tmdb": "TMDB",
+  "tmdb_id": "TMDB ID",
+  "tmdb_name": "TMDB 名称",
+  "tmdb_year": "年份",
+  "tmdb_matched": "TMDB 状态",
+  "media_type": "媒体类型",
+  "category": "分类",
+  "season": "季",
+  "status": "状态",
+  "local_etf_path": "同目录 ETF",
+  "archive_etf_path": "归档 ETF",
+  "updated_at": "更新时间",
+  "correct": "纠正归档"
+}

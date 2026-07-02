@@ -160,6 +160,12 @@ export const side_menu_items: SideMenuItem[] = [
         role: UserRole.GENERAL,
         component: lazy(() => import("./tasks/Decompress")),
       },
+      {
+        title: "manage.sidemenu.etf_archive",
+        icon: TbArchive,
+        to: "/@manage/tasks/etf_archive",
+        component: lazy(() => import("./etf_archive/ETFArchive")),
+      },
     ],
   },
   {

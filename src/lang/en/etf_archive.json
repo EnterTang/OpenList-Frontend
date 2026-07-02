@@ -1,0 +1,21 @@
+{
+  "keyword": "Name keyword",
+  "filter": "Filter",
+  "all": "All",
+  "matched": "Matched",
+  "unmatched": "Unmatched",
+  "source_name": "Source name",
+  "tmdb": "TMDB",
+  "tmdb_id": "TMDB ID",
+  "tmdb_name": "TMDB name",
+  "tmdb_year": "Year",
+  "tmdb_matched": "TMDB status",
+  "media_type": "Media type",
+  "category": "Category",
+  "season": "Season",
+  "status": "Status",
+  "local_etf_path": "Local ETF",
+  "archive_etf_path": "Archive ETF",
+  "updated_at": "Updated at",
+  "correct": "Correct archive"
+}

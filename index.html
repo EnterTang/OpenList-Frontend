@@ -25,7 +25,21 @@
         api: undefined,
         main_color: undefined,
       }
-      window.__dynamic_base__ = window.OPENLIST_CONFIG.cdn || ""
+      function normalizeDynamicBase(value) {
+        if (!value) return ""
+        var base = String(value).trim()
+        if (!base) return ""
+        if (/^https?:\/{0,2}$/i.test(base)) return ""
+        if (/^https?:\/(?!\/)/i.test(base)) return ""
+        try {
+          var url = new URL(base, window.location.origin)
+          if (/^https?:\/\//i.test(base) && !url.host) return ""
+        } catch (_) {
+          return ""
+        }
+        return base.replace(/\/+$/, "")
+      }
+      window.__dynamic_base__ = normalizeDynamicBase(window.OPENLIST_CONFIG.cdn)
     </script>
   </head>
   <body>
