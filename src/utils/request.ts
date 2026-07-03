@@ -27,6 +27,9 @@ instance.interceptors.request.use(
 instance.interceptors.response.use(
   (response) => {
     const resp = response.data
+    if (resp?.code === 401 && shouldClearStoredToken(resp.message)) {
+      changeToken()
+    }
     log(resp)
     return resp
   },
@@ -51,6 +54,16 @@ instance.defaults.headers.common["Authorization"] =
 export const changeToken = (token?: string) => {
   instance.defaults.headers.common["Authorization"] = token ?? ""
   localStorage.setItem("token", token ?? "")
+}
+
+const shouldClearStoredToken = (message?: string) => {
+  const normalized = (message || "").toLowerCase()
+  return (
+    normalized.includes("token is invalidated") ||
+    normalized.includes("token is expired") ||
+    normalized.includes("password has been changed") ||
+    normalized.includes("current user is disabled")
+  )
 }
 
 export { instance as r }

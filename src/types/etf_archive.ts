@@ -33,3 +33,47 @@ export interface ETFArchiveCorrection {
   category: string
   season: number
 }
+
+export interface ETFArchiveTMDBCandidate {
+  tmdb_id: number
+  name: string
+  original_name: string
+  year: number
+  media_type: string
+  category: string
+  genre_ids: number[]
+  origin_country: string[]
+  original_language: string
+}
+
+export interface ETFManualArchiveMetadata {
+  tmdb_id: number
+  name: string
+  original_name: string
+  year: number
+  media_type: string
+  category: string
+  season: number
+  start_episode: number
+}
+
+export interface ETFManualArchiveItem {
+  original_name: string
+  new_name: string
+  original_path: string
+  new_path: string
+  archive_path: string
+  source_name: string
+  source_size: number
+  source_sha256: string
+  season: number
+  episode: number
+}
+
+export interface ETFManualArchivePreview {
+  source_path: string
+  target_folder_name: string
+  archive_root: string
+  archive_dir_path: string
+  items: ETFManualArchiveItem[]
+}

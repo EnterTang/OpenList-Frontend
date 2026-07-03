@@ -12,6 +12,10 @@ import {
   TorrentInfo,
   TorrentUploadParseResult,
   TorrentRapidUploadResult,
+  ETFArchiveTMDBCandidate,
+  ETFManualArchiveItem,
+  ETFManualArchiveMetadata,
+  ETFManualArchivePreview,
 } from "~/types"
 import { r } from "."
 
@@ -306,4 +310,27 @@ export const torrentRapidUpload = (
   path: string,
 ): PResp<TorrentRapidUploadResult> => {
   return r.post("/fs/torrent/rapid_upload", { torrent_data, path })
+}
+
+export const etfArchiveTMDBSearch = (
+  query: string,
+): PResp<ETFArchiveTMDBCandidate[]> => {
+  return r.get(
+    `/admin/etf_archive/tmdb/search?query=${encodeURIComponent(query)}`,
+  )
+}
+
+export const etfManualArchivePreview = (
+  path: string,
+  metadata: ETFManualArchiveMetadata,
+): PResp<ETFManualArchivePreview> => {
+  return r.post("/admin/etf_archive/manual/preview", { path, metadata })
+}
+
+export const etfManualArchiveApply = (
+  path: string,
+  metadata: ETFManualArchiveMetadata,
+  items: ETFManualArchiveItem[],
+): PResp<ETFManualArchivePreview> => {
+  return r.post("/admin/etf_archive/manual/apply", { path, metadata, items })
 }

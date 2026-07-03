@@ -134,6 +134,23 @@ export const ContextMenu = () => {
       >
         <ItemContent name="offline_download_torrent" />
       </Item>
+      <Item
+        hidden={() => {
+          const obj = selectedObjs()[0]
+          return (
+            isShare() ||
+            !UserMethods.is_admin(me()) ||
+            !objStore.write ||
+            !oneChecked() ||
+            !obj?.is_dir
+          )
+        }}
+        onClick={() => {
+          bus.emit("tool", "manual_etf_archive")
+        }}
+      >
+        <ItemContent name="manual_etf_archive" />
+      </Item>
       <Show when={oneChecked()}>
         <Item
           onClick={({ props }) => {

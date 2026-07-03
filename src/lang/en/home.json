@@ -165,7 +165,19 @@
     "sequential_renaming_desc": "The new file name will have a numerical starting value appended to it, and it will be displayed sequentially by adding 1 to the starting value. Enter the new file name on the first line and the starting value on the second line. Supports {number} placeholders.",
     "sequential_renaming_input3_placeholder": "Padding zeros (optional)",
     "find_replace": "Find and Replace",
-    "find_replace_desc": "Find and Replace"
+    "find_replace_desc": "Find and Replace",
+    "manual_etf_archive": "Manual ETF archive",
+    "manual_etf_archive_folder_required": "Please select one folder",
+    "manual_etf_archive_search": "Search TMDB title",
+    "manual_etf_archive_search_button": "Search",
+    "manual_etf_archive_select_required": "Please select a TMDB result first",
+    "manual_etf_archive_preview_required": "Please generate a preview first",
+    "manual_etf_archive_preview": "Preview",
+    "manual_etf_archive_start": "Start episode",
+    "manual_etf_archive_target": "Archive target",
+    "manual_etf_archive_old": "Original ETF",
+    "manual_etf_archive_new": "New ETF",
+    "manual_etf_archive_archive": "Archive path"
   },
   "upload": {
     "add_as_task": "Add as task",

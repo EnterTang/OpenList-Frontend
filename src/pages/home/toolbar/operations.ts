@@ -33,6 +33,7 @@ export const operations: Operations = {
   download: { icon: AiOutlineCloudDownload, color: "$primary9" },
   share: { icon: CgShare, color: "$primary9" },
   offline_download_torrent: { icon: FaSolidMagnet, color: "$accent9" },
+  manual_etf_archive: { icon: TbArchive, color: "$accent9" },
 }
 // interface Operation {
 //   label: string;
