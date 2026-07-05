@@ -8,10 +8,12 @@ import indexes from "./indexes.json"
 import login from "./login.json"
 import manage from "./manage.json"
 import metas from "./metas.json"
+import mobile_share from "./mobile_share.json"
 import settings_other from "./settings_other.json"
 import settings from "./settings.json"
 import shares from "./shares.json"
 import storages from "./storages.json"
+import subscription from "./subscription.json"
 import tasks from "./tasks.json"
 import users from "./users.json"
 
@@ -26,10 +28,12 @@ export const dict = {
   login,
   manage,
   metas,
+  mobile_share,
   settings_other,
   settings,
   shares,
   storages,
+  subscription,
   tasks,
   users,
 }

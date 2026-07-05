@@ -18,6 +18,7 @@ import { BackTop } from "./BackTop"
 import { Decompress } from "./Decompress"
 import { Share } from "./Share"
 import { ManualETFArchive } from "./ManualETFArchive"
+import { MobileShare } from "./MobileShare"
 
 const Upload = lazy(() => import("../uploads/Upload"))
 
@@ -32,6 +33,7 @@ export const Modal = () => {
       <NewFile />
       <Mkdir />
       <Share />
+      <MobileShare />
       <RecursiveMove />
       <RemoveEmptyDirectory />
       <BatchRename />

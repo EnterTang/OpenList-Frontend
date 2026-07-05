@@ -1,0 +1,24 @@
+{
+  "sidebar": {
+    "title": "OpenList",
+    "collapse": "收起側邊欄",
+    "netdisk": "網盤管理",
+    "subscriptions": "訂閱管理",
+    "mobile_share": "移動分享管理"
+  },
+  "toolbar": {
+    "mobile_share": "建立移動分享連結",
+    "manual_etf_archive": "手動 ETF 歸檔",
+    "manual_etf_archive_folder_required": "請選擇一個資料夾",
+    "manual_etf_archive_search": "搜尋 TMDB 標題",
+    "manual_etf_archive_search_button": "搜尋",
+    "manual_etf_archive_select_required": "請先選擇一個 TMDB 結果",
+    "manual_etf_archive_preview_required": "請先產生預覽",
+    "manual_etf_archive_preview": "預覽",
+    "manual_etf_archive_start": "起始集數",
+    "manual_etf_archive_target": "歸檔目標",
+    "manual_etf_archive_old": "原 ETF",
+    "manual_etf_archive_new": "新 ETF",
+    "manual_etf_archive_archive": "歸檔路徑"
+  }
+}

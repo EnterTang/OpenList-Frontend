@@ -1,0 +1,24 @@
+{
+  "sidebar": {
+    "title": "OpenList",
+    "collapse": "收起侧边栏",
+    "netdisk": "网盘管理",
+    "subscriptions": "订阅管理",
+    "mobile_share": "移动分享管理"
+  },
+  "toolbar": {
+    "mobile_share": "创建移动分享链接",
+    "manual_etf_archive": "手动 ETF 归档",
+    "manual_etf_archive_folder_required": "请选择一个文件夹",
+    "manual_etf_archive_search": "搜索 TMDB 标题",
+    "manual_etf_archive_search_button": "搜索",
+    "manual_etf_archive_select_required": "请先选择一个 TMDB 结果",
+    "manual_etf_archive_preview_required": "请先生成预览",
+    "manual_etf_archive_preview": "预览",
+    "manual_etf_archive_start": "起始集数",
+    "manual_etf_archive_target": "归档目标",
+    "manual_etf_archive_old": "原 ETF",
+    "manual_etf_archive_new": "新 ETF",
+    "manual_etf_archive_archive": "归档路径"
+  }
+}

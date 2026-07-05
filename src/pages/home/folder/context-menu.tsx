@@ -46,6 +46,13 @@ export const ContextMenu = () => {
   }
   const { rawLink } = useLink()
   const { isShare } = useRouter()
+  const is139Selected = () => {
+    const obj = selectedObjs()[0]
+    return (
+      objStore.provider === "139Yun" ||
+      obj?.mount_details?.driver_name === "139Yun"
+    )
+  }
   return (
     <Menu
       id={1}
@@ -72,6 +79,19 @@ export const ContextMenu = () => {
         }}
       >
         <ItemContent name="share" />
+      </Item>
+      <Item
+        hidden={() =>
+          isShare() ||
+          !UserMethods.is_admin(me()) ||
+          !oneChecked() ||
+          !is139Selected()
+        }
+        onClick={() => {
+          bus.emit("tool", "mobile_share")
+        }}
+      >
+        <ItemContent name="mobile_share" />
       </Item>
       <Item
         hidden={() => {
@@ -142,6 +162,7 @@ export const ContextMenu = () => {
             !UserMethods.is_admin(me()) ||
             !objStore.write ||
             !oneChecked() ||
+            !is139Selected() ||
             !obj?.is_dir
           )
         }}

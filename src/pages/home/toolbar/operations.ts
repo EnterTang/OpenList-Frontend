@@ -32,6 +32,7 @@ export const operations: Operations = {
   cancel_select: { icon: TiDeleteOutline },
   download: { icon: AiOutlineCloudDownload, color: "$primary9" },
   share: { icon: CgShare, color: "$primary9" },
+  mobile_share: { icon: CgShare, color: "$accent9" },
   offline_download_torrent: { icon: FaSolidMagnet, color: "$accent9" },
   manual_etf_archive: { icon: TbArchive, color: "$accent9" },
 }

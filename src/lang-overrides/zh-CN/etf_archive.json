@@ -13,9 +13,13 @@
   "media_type": "媒体类型",
   "category": "分类",
   "season": "季",
+  "episode": "集",
   "status": "状态",
   "local_etf_path": "同目录 ETF",
   "archive_etf_path": "归档 ETF",
   "updated_at": "更新时间",
-  "correct": "纠正归档"
+  "correct": "纠正归档",
+  "tmdb_search": "TMDB 搜索",
+  "tmdb_search_placeholder": "标题或 TMDB ID",
+  "search": "搜索"
 }

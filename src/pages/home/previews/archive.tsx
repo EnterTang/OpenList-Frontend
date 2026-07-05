@@ -22,6 +22,8 @@ import {
   Switch,
   Suspense,
   onCleanup,
+  type Component,
+  type JSXElement,
 } from "solid-js"
 import { Dynamic } from "solid-js/web"
 import {
@@ -67,6 +69,12 @@ import { TbCopy, TbLink } from "solid-icons/tb"
 import { AiOutlineCloudDownload } from "solid-icons/ai"
 import { Operations } from "~/pages/home/toolbar/operations"
 import "solid-contextmenu/dist/style.css"
+
+const ArchiveDynamic = Dynamic as unknown as (props: {
+  component: Component | undefined
+  images: ArchiveObj[]
+  navigate: (name: string) => void
+}) => JSXElement
 
 const download = (url: string) => {
   window.open(url, "_blank")
@@ -572,10 +580,10 @@ const Preview = () => {
             <VStack w="$full" spacing="$2" alignItems="center">
               <Show when={currentPreview()}>
                 <Suspense fallback={<FullLoading />}>
-                  <Dynamic
+                  <ArchiveDynamic
                     component={currentPreview()?.component}
                     images={files().filter((f) => f.type === ObjType.IMAGE)}
-                    navigate={(name) => {
+                    navigate={(name: string) => {
                       changeFile(name)
                     }}
                   />

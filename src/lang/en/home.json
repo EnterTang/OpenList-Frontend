@@ -59,6 +59,13 @@
     "grid": "Grid View",
     "image": "Image View"
   },
+  "sidebar": {
+    "title": "OpenList",
+    "collapse": "Collapse sidebar",
+    "netdisk": "Drive management",
+    "subscriptions": "Subscription management",
+    "mobile_share": "Mobile share management"
+  },
   "no_images": "No images in the current folder",
   "load_more": "Load more",
   "no_more": "No more",
@@ -88,6 +95,7 @@
       "extract_header": "Extract {{path}} to..."
     },
     "share": "Share",
+    "mobile_share": "Create mobile share link",
     "copy_link": "Copy link",
     "preview_page": "Preview page",
     "down_link": "Download link",

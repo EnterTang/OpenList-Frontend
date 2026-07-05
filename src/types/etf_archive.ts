@@ -19,6 +19,7 @@ export interface ETFArchiveRecord {
   media_type: string
   category: string
   season: number
+  episode: number
   source_size: number
   source_sha256: string
   status: ETFArchiveStatus
@@ -32,6 +33,7 @@ export interface ETFArchiveCorrection {
   media_type: string
   category: string
   season: number
+  episode: number
 }
 
 export interface ETFArchiveTMDBCandidate {
@@ -41,6 +43,8 @@ export interface ETFArchiveTMDBCandidate {
   year: number
   media_type: string
   category: string
+  poster_path: string
+  poster_url: string
   genre_ids: number[]
   origin_country: string[]
   original_language: string

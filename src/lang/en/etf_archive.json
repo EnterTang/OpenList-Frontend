@@ -13,9 +13,13 @@
   "media_type": "Media type",
   "category": "Category",
   "season": "Season",
+  "episode": "Episode",
   "status": "Status",
   "local_etf_path": "Local ETF",
   "archive_etf_path": "Archive ETF",
   "updated_at": "Updated at",
-  "correct": "Correct archive"
+  "correct": "Correct archive",
+  "tmdb_search": "TMDB search",
+  "tmdb_search_placeholder": "Title or TMDB ID",
+  "search": "Search"
 }

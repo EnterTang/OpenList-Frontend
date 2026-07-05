@@ -16,6 +16,11 @@ import {
   ETFManualArchiveItem,
   ETFManualArchiveMetadata,
   ETFManualArchivePreview,
+  MobileShareCreateResult,
+  MobileShareRecord,
+  Subscription,
+  SubscriptionConfig,
+  SubscriptionRunResult,
 } from "~/types"
 import { r } from "."
 
@@ -333,4 +338,68 @@ export const etfManualArchiveApply = (
   items: ETFManualArchiveItem[],
 ): PResp<ETFManualArchivePreview> => {
   return r.post("/admin/etf_archive/manual/apply", { path, metadata, items })
+}
+
+export const mobileShareCreate = (
+  path: string,
+  force = false,
+  periodUnit = 1,
+): PResp<MobileShareCreateResult> => {
+  return r.post("/admin/mobile_share/create", {
+    path,
+    force,
+    period_unit: periodUnit,
+  })
+}
+
+export const mobileShareList = (
+  params: {
+    keyword?: string
+    storage_mount_path?: string
+    source_type?: string
+    is_valid?: string
+    page?: number
+    per_page?: number
+  } = {},
+): PPageResp<MobileShareRecord> => {
+  return r.get("/admin/mobile_share/list", { params })
+}
+
+export const subscriptionList = (
+  params: {
+    keyword?: string
+    source_type?: string
+    active?: string
+    page?: number
+    per_page?: number
+  } = {},
+): PPageResp<Subscription> => {
+  return r.get("/admin/subscription/list", { params })
+}
+
+export const subscriptionCreate = (
+  subscription: Partial<Subscription>,
+): PResp<Subscription> => {
+  return r.post("/admin/subscription/create", subscription)
+}
+
+export const subscriptionDelete = (id: number): PEmptyResp => {
+  return r.post("/admin/subscription/delete", { id })
+}
+
+export const subscriptionCheck = (
+  id: number,
+  transfer = false,
+): PResp<SubscriptionRunResult> => {
+  return r.post("/admin/subscription/check", { id, transfer })
+}
+
+export const subscriptionConfigGet = (): PResp<SubscriptionConfig> => {
+  return r.get("/admin/subscription/config")
+}
+
+export const subscriptionConfigSave = (
+  config: SubscriptionConfig,
+): PResp<SubscriptionConfig> => {
+  return r.post("/admin/subscription/config", config)
 }
