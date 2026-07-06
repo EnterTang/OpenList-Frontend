@@ -20,6 +20,7 @@ import {
   MobileShareRecord,
   Subscription,
   SubscriptionConfig,
+  SubscriptionTelegramAuthResp,
   SubscriptionRunResult,
 } from "~/types"
 import { r } from "."
@@ -403,3 +404,31 @@ export const subscriptionConfigSave = (
 ): PResp<SubscriptionConfig> => {
   return r.post("/admin/subscription/config", config)
 }
+
+export const subscriptionTelegramStatus =
+  (): PResp<SubscriptionTelegramAuthResp> => {
+    return r.post("/admin/subscription/telegram/status", {})
+  }
+
+export const subscriptionTelegramSendCode = (
+  phone: string,
+): PResp<SubscriptionTelegramAuthResp> => {
+  return r.post("/admin/subscription/telegram/send_code", { phone })
+}
+
+export const subscriptionTelegramSignIn = (
+  phone: string,
+  code: string,
+  phoneCodeHash: string,
+): PResp<SubscriptionTelegramAuthResp> => {
+  return r.post("/admin/subscription/telegram/signin", {
+    phone,
+    code,
+    phone_code_hash: phoneCodeHash,
+  })
+}
+
+export const subscriptionTelegramLogout =
+  (): PResp<SubscriptionTelegramAuthResp> => {
+    return r.post("/admin/subscription/telegram/logout", {})
+  }

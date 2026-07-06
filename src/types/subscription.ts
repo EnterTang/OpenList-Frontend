@@ -69,12 +69,32 @@ export interface SubscriptionTelegramSourceConfig {
   api_hash: string
   session_file: string
   channels: string[]
+  quark_channels: string[]
+  aliyun_drive_channels: string[]
+  pan123_channels: string[]
+  pan115_channels: string[]
   search_command: string[]
   auth_command: string[]
   command_env: string[]
   command_timeout_seconds: number
   limit: number
   query: string
+}
+
+export interface SubscriptionTelegramAuthResp {
+  ok?: boolean
+  authorized: boolean
+  user?: {
+    id?: number | string
+    username?: string
+    phone?: string
+    firstName?: string
+    first_name?: string
+    lastName?: string
+    last_name?: string
+  }
+  phone_code_hash?: string
+  error?: string
 }
 
 export interface SubscriptionPanSouSourceConfig {

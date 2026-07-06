@@ -5,6 +5,7 @@ import {
   FormControl,
   FormLabel,
   HStack,
+  Image,
   Input,
   Select,
   SelectContent,
@@ -30,10 +31,14 @@ import {
 } from "@hope-ui/solid"
 import {
   AiOutlineDelete,
+  AiOutlineLogin,
+  AiOutlineLogout,
   AiOutlinePlayCircle,
   AiOutlinePlus,
   AiOutlineReload,
   AiOutlineSave,
+  AiOutlineSearch,
+  AiOutlineSend,
 } from "solid-icons/ai"
 import {
   JSXElement,
@@ -49,10 +54,13 @@ import { useFetch, useT } from "~/hooks"
 import {
   Subscription,
   SubscriptionConfig,
+  ETFArchiveTMDBCandidate,
   SubscriptionMediaType,
   SubscriptionSourceType,
+  SubscriptionTelegramAuthResp,
 } from "~/types"
 import {
+  etfArchiveTMDBSearch,
   handleResp,
   notify,
   subscriptionCheck,
@@ -61,6 +69,10 @@ import {
   subscriptionCreate,
   subscriptionDelete,
   subscriptionList,
+  subscriptionTelegramLogout,
+  subscriptionTelegramSendCode,
+  subscriptionTelegramSignIn,
+  subscriptionTelegramStatus,
 } from "~/utils"
 import { Container } from "./Container"
 
@@ -100,6 +112,10 @@ const emptyTelegramConfig = {
   api_hash: "",
   session_file: "",
   channels: [],
+  quark_channels: [],
+  aliyun_drive_channels: [],
+  pan123_channels: [],
+  pan115_channels: [],
   search_command: [],
   auth_command: [],
   command_env: [],
@@ -132,7 +148,10 @@ const defaultSourceConfigText = (sourceType: SubscriptionSourceType) => {
     case "telegram":
       return JSON.stringify(
         {
-          channels: ["@channel"],
+          quark_channels: [],
+          aliyun_drive_channels: [],
+          pan123_channels: [],
+          pan115_channels: [],
           query: "",
         },
         null,
@@ -169,6 +188,19 @@ const joinLines = (values?: string[]) => (values || []).join("\n")
 const numberValue = (value: string) => {
   const parsed = Number(value)
   return Number.isFinite(parsed) ? parsed : 0
+}
+
+const telegramUserLabel = (status?: SubscriptionTelegramAuthResp) => {
+  const user = status?.user
+  if (!status?.authorized || !user) return ""
+  if (user.username) return `@${user.username}`
+  if (user.phone) return user.phone
+  if (user.firstName || user.first_name || user.lastName || user.last_name) {
+    return [user.firstName || user.first_name, user.lastName || user.last_name]
+      .filter(Boolean)
+      .join(" ")
+  }
+  return user.id ? `#${user.id}` : ""
 }
 
 const FormField = (props: {
@@ -210,7 +242,18 @@ export const SubscriptionManagement = () => {
     media_type: "tv",
     season: 1,
   })
+  const [tmdbQuery, setTMDBQuery] = createSignal("")
+  const [tmdbCandidates, setTMDBCandidates] = createSignal<
+    ETFArchiveTMDBCandidate[]
+  >([])
+  const [selectedTMDBCandidate, setSelectedTMDBCandidate] =
+    createSignal<ETFArchiveTMDBCandidate>()
   const [config, setConfig] = createSignal<SubscriptionConfig>(defaultConfig())
+  const [telegramAuth, setTelegramAuth] =
+    createSignal<SubscriptionTelegramAuthResp>()
+  const [telegramPhone, setTelegramPhone] = createSignal("")
+  const [telegramCode, setTelegramCode] = createSignal("")
+  const [telegramPhoneCodeHash, setTelegramPhoneCodeHash] = createSignal("")
   let resetPaginator: (() => void) | undefined
 
   const [listLoading, listSubs] = useFetch(() =>
@@ -225,8 +268,21 @@ export const SubscriptionManagement = () => {
   const [createLoading, createSub] = useFetch(subscriptionCreate)
   const [deleteLoading, deleteSub] = useFetch(subscriptionDelete)
   const [checkLoading, checkSub] = useFetch(subscriptionCheck)
+  const [tmdbSearchLoading, searchTMDB] = useFetch(etfArchiveTMDBSearch)
   const [configLoading, loadConfig] = useFetch(subscriptionConfigGet)
   const [saveConfigLoading, saveConfig] = useFetch(subscriptionConfigSave)
+  const [telegramStatusLoading, loadTelegramStatus] = useFetch(
+    subscriptionTelegramStatus,
+  )
+  const [telegramSendCodeLoading, sendTelegramCodeReq] = useFetch(
+    subscriptionTelegramSendCode,
+  )
+  const [telegramSignInLoading, signInTelegramReq] = useFetch(
+    subscriptionTelegramSignIn,
+  )
+  const [telegramLogoutLoading, logoutTelegramReq] = useFetch(
+    subscriptionTelegramLogout,
+  )
 
   const refresh = async () => {
     const resp = await listSubs()
@@ -251,6 +307,63 @@ export const SubscriptionManagement = () => {
     setFormSourceType(value)
     setForm((prev) => ({ ...prev, source_type: value }))
     setSourceConfigText(defaultSourceConfigText(value))
+  }
+
+  const searchTMDBCandidates = async () => {
+    const query = tmdbQuery().trim()
+    if (!query) {
+      notify.warning(t("global.empty_input"))
+      return
+    }
+    const resp = await searchTMDB(query)
+    handleResp(resp, (data) => setTMDBCandidates(data))
+  }
+
+  const selectTMDBCandidate = (candidate: ETFArchiveTMDBCandidate) => {
+    const mediaType: SubscriptionMediaType =
+      candidate.media_type === "movie" ? "movie" : "tv"
+    setSelectedTMDBCandidate(candidate)
+    setTMDBQuery(candidate.name)
+    setTMDBCandidates([])
+    setForm((prev) => ({
+      ...prev,
+      name: candidate.name,
+      tmdb_id: candidate.tmdb_id,
+      tmdb_name: candidate.name,
+      tmdb_year: candidate.year || 0,
+      media_type: mediaType,
+      category: candidate.category || prev.category || "",
+      season: mediaType === "tv" ? prev.season || 1 : 0,
+    }))
+  }
+
+  const clearSelectedTMDBCandidate = () => {
+    setSelectedTMDBCandidate(undefined)
+    setTMDBCandidates([])
+    setForm((prev) => ({
+      ...prev,
+      name: "",
+      tmdb_id: 0,
+      tmdb_name: "",
+      tmdb_year: 0,
+      category: "",
+      season: 1,
+    }))
+  }
+
+  const resetCreateForm = () => {
+    setFormSourceType("manual")
+    setSourceConfigText(defaultSourceConfigText("manual"))
+    setForm({
+      active: true,
+      check_interval_minutes: 60,
+      transfer_enabled: true,
+      media_type: "tv",
+      season: 1,
+    })
+    setTMDBQuery("")
+    setTMDBCandidates([])
+    setSelectedTMDBCandidate(undefined)
   }
 
   const updateForm = <K extends keyof Subscription>(
@@ -282,6 +395,7 @@ export const SubscriptionManagement = () => {
     const resp = await createSub(payload)
     handleResp(resp, () => {
       notify.success(t("global.save_success"))
+      resetCreateForm()
       setTab("list")
       refresh()
     })
@@ -339,9 +453,72 @@ export const SubscriptionManagement = () => {
     })
   }
 
+  const saveCurrentConfig = async () => {
+    const resp = await saveConfig(config())
+    if (resp.code !== 200) {
+      handleResp(resp)
+      return false
+    }
+    setConfig(fillConfig(resp.data))
+    return true
+  }
+
+  const refreshTelegramStatus = async () => {
+    const resp = await loadTelegramStatus()
+    handleResp(resp, (data) => setTelegramAuth(data))
+  }
+
+  const sendTelegramCode = async () => {
+    if (!config().telegram.api_id || !config().telegram.api_hash.trim()) {
+      notify.error(t("subscription.telegram_api_required"))
+      return
+    }
+    if (!telegramPhone().trim()) {
+      notify.error(t("subscription.telegram_phone_required"))
+      return
+    }
+    if (!(await saveCurrentConfig())) return
+    const resp = await sendTelegramCodeReq(telegramPhone().trim())
+    handleResp(resp, (data) => {
+      setTelegramAuth(data)
+      setTelegramPhoneCodeHash(data.phone_code_hash || "")
+      notify.success(t("subscription.telegram_code_sent"))
+    })
+  }
+
+  const signInTelegram = async () => {
+    if (
+      !telegramPhone().trim() ||
+      !telegramCode().trim() ||
+      !telegramPhoneCodeHash().trim()
+    ) {
+      notify.error(t("subscription.telegram_code_required"))
+      return
+    }
+    const resp = await signInTelegramReq(
+      telegramPhone().trim(),
+      telegramCode().trim(),
+      telegramPhoneCodeHash().trim(),
+    )
+    handleResp(resp, (data) => {
+      setTelegramAuth(data)
+      setTelegramCode("")
+      notify.success(t("subscription.telegram_login_success"))
+    })
+  }
+
+  const logoutTelegram = async () => {
+    const resp = await logoutTelegramReq()
+    handleResp(resp, (data) => {
+      setTelegramAuth(data)
+      setTelegramPhoneCodeHash("")
+      notify.success(t("subscription.telegram_logout_success"))
+    })
+  }
+
   onMount(() => {
     refresh()
-    refreshConfig()
+    refreshConfig().then(() => refreshTelegramStatus())
   })
 
   return (
@@ -406,146 +583,249 @@ export const SubscriptionManagement = () => {
 
               <Match when={tab() === "add"}>
                 <VStack spacing="$4" alignItems="stretch">
-                  <Box
-                    display="grid"
-                    gap="$3"
-                    gridTemplateColumns={{
-                      "@initial": "1fr",
-                      "@md": "repeat(2, minmax(0, 1fr))",
-                    }}
-                  >
-                    <FormField label={t("subscription.name")}>
-                      <Input
-                        value={form().name || ""}
-                        onInput={(e) =>
-                          updateForm("name", e.currentTarget.value)
-                        }
-                      />
+                  <VStack spacing="$3" alignItems="stretch">
+                    <FormField label={t("subscription.tmdb_search")}>
+                      <HStack spacing="$2" alignItems="stretch">
+                        <Input
+                          value={tmdbQuery()}
+                          placeholder={t(
+                            "subscription.tmdb_search_placeholder",
+                          )}
+                          onInput={(e) => setTMDBQuery(e.currentTarget.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") searchTMDBCandidates()
+                          }}
+                        />
+                        <Button
+                          leftIcon={<AiOutlineSearch />}
+                          loading={tmdbSearchLoading()}
+                          onClick={searchTMDBCandidates}
+                        >
+                          {t("subscription.search")}
+                        </Button>
+                      </HStack>
                     </FormField>
-                    <FormField label={t("subscription.source_type")}>
-                      <SourceSelect
-                        value={formSourceType()}
-                        onChange={selectSourceType}
-                      />
-                    </FormField>
-                    <FormField label={t("subscription.tmdb_name")}>
-                      <Input
-                        value={form().tmdb_name || ""}
-                        onInput={(e) =>
-                          updateForm("tmdb_name", e.currentTarget.value)
-                        }
-                      />
-                    </FormField>
-                    <FormField label={t("subscription.tmdb_id")}>
-                      <Input
-                        type="number"
-                        value={form().tmdb_id || 0}
-                        onInput={(e) =>
-                          updateForm(
-                            "tmdb_id",
-                            numberValue(e.currentTarget.value),
-                          )
-                        }
-                      />
-                    </FormField>
-                    <FormField label={t("subscription.tmdb_year")}>
-                      <Input
-                        type="number"
-                        value={form().tmdb_year || 0}
-                        onInput={(e) =>
-                          updateForm(
-                            "tmdb_year",
-                            numberValue(e.currentTarget.value),
-                          )
-                        }
-                      />
-                    </FormField>
-                    <FormField label={t("subscription.media_type")}>
-                      <MediaTypeSelect
-                        value={form().media_type || "tv"}
-                        onChange={(value) => updateForm("media_type", value)}
-                      />
-                    </FormField>
-                    <FormField label={t("subscription.category")}>
-                      <Input
-                        value={form().category || ""}
-                        onInput={(e) =>
-                          updateForm("category", e.currentTarget.value)
-                        }
-                      />
-                    </FormField>
-                    <FormField label={t("subscription.season")}>
-                      <Input
-                        type="number"
-                        value={form().season || 1}
-                        onInput={(e) =>
-                          updateForm(
-                            "season",
-                            numberValue(e.currentTarget.value),
-                          )
-                        }
-                      />
-                    </FormField>
-                    <FormField label={t("subscription.target_root")}>
-                      <Input
-                        value={form().target_root || ""}
-                        onInput={(e) =>
-                          updateForm("target_root", e.currentTarget.value)
-                        }
-                      />
-                    </FormField>
-                    <FormField label={t("subscription.check_interval_minutes")}>
-                      <Input
-                        type="number"
-                        value={form().check_interval_minutes || 60}
-                        onInput={(e) =>
-                          updateForm(
-                            "check_interval_minutes",
-                            numberValue(e.currentTarget.value),
-                          )
-                        }
-                      />
-                    </FormField>
-                    <FormField label={t("subscription.active")}>
-                      <HopeSwitch
-                        checked={form().active ?? true}
-                        onChange={(e: { currentTarget: HTMLInputElement }) =>
-                          updateForm("active", e.currentTarget.checked)
-                        }
-                      />
-                    </FormField>
-                    <FormField label={t("subscription.transfer_enabled")}>
-                      <HopeSwitch
-                        checked={form().transfer_enabled ?? true}
-                        onChange={(e: { currentTarget: HTMLInputElement }) =>
-                          updateForm(
-                            "transfer_enabled",
-                            e.currentTarget.checked,
-                          )
-                        }
-                      />
-                    </FormField>
-                    <FormField label={t("subscription.source_config")} full>
-                      <Textarea
-                        rows={8}
-                        fontFamily="monospace"
-                        value={sourceConfigText()}
-                        onInput={(e) =>
-                          setSourceConfigText(e.currentTarget.value)
-                        }
-                      />
-                    </FormField>
-                  </Box>
-                  <HStack justifyContent="flex-end">
-                    <Button
-                      colorScheme="accent"
-                      leftIcon={<AiOutlineSave />}
-                      loading={createLoading()}
-                      onClick={submitSubscription}
-                    >
-                      {t("subscription.create_subscription")}
-                    </Button>
-                  </HStack>
+                    <Show when={tmdbCandidates().length > 0}>
+                      <Box
+                        display="grid"
+                        gap="$2"
+                        gridTemplateColumns={{
+                          "@initial": "1fr",
+                          "@md": "repeat(2, minmax(0, 1fr))",
+                        }}
+                      >
+                        <For each={tmdbCandidates()}>
+                          {(candidate) => (
+                            <TMDBCandidateButton
+                              candidate={candidate}
+                              selected={
+                                selectedTMDBCandidate()?.tmdb_id ===
+                                candidate.tmdb_id
+                              }
+                              onSelect={selectTMDBCandidate}
+                            />
+                          )}
+                        </For>
+                      </Box>
+                    </Show>
+                    <Show when={selectedTMDBCandidate()}>
+                      {(candidate) => (
+                        <HStack
+                          spacing="$2"
+                          flexWrap="wrap"
+                          alignItems="center"
+                          p="$2"
+                          border="1px solid"
+                          borderColor="$success7"
+                          bgColor="$success3"
+                          rounded="$md"
+                        >
+                          <Badge colorScheme="success">
+                            {t("subscription.tmdb_selected")}
+                          </Badge>
+                          <Text fontWeight="$semibold">
+                            {candidate().name}
+                            <Show when={candidate().year}>
+                              {(year) => ` (${year()})`}
+                            </Show>
+                          </Text>
+                          <Text color="$neutral11" fontSize="$sm">
+                            TMDB {candidate().tmdb_id} ·{" "}
+                            {t(
+                              `subscription.media_types.${
+                                candidate().media_type === "movie"
+                                  ? "movie"
+                                  : "tv"
+                              }`,
+                            )}
+                            <Show when={candidate().category}>
+                              {" · "}
+                              {candidate().category}
+                            </Show>
+                          </Text>
+                          <Button
+                            size="sm"
+                            variant="subtle"
+                            onClick={clearSelectedTMDBCandidate}
+                          >
+                            {t("subscription.tmdb_reselect")}
+                          </Button>
+                        </HStack>
+                      )}
+                    </Show>
+                  </VStack>
+
+                  <Show when={selectedTMDBCandidate()}>
+                    <VStack spacing="$4" alignItems="stretch">
+                      <Box
+                        display="grid"
+                        gap="$3"
+                        gridTemplateColumns={{
+                          "@initial": "1fr",
+                          "@md": "repeat(2, minmax(0, 1fr))",
+                        }}
+                      >
+                        <FormField label={t("subscription.name")}>
+                          <Input
+                            value={form().name || ""}
+                            onInput={(e) =>
+                              updateForm("name", e.currentTarget.value)
+                            }
+                          />
+                        </FormField>
+                        <FormField label={t("subscription.source_type")}>
+                          <SourceSelect
+                            value={formSourceType()}
+                            onChange={selectSourceType}
+                          />
+                        </FormField>
+                        <FormField label={t("subscription.tmdb_name")}>
+                          <Input
+                            value={form().tmdb_name || ""}
+                            onInput={(e) =>
+                              updateForm("tmdb_name", e.currentTarget.value)
+                            }
+                          />
+                        </FormField>
+                        <FormField label={t("subscription.tmdb_id")}>
+                          <Input
+                            type="number"
+                            value={form().tmdb_id || 0}
+                            onInput={(e) =>
+                              updateForm(
+                                "tmdb_id",
+                                numberValue(e.currentTarget.value),
+                              )
+                            }
+                          />
+                        </FormField>
+                        <FormField label={t("subscription.tmdb_year")}>
+                          <Input
+                            type="number"
+                            value={form().tmdb_year || 0}
+                            onInput={(e) =>
+                              updateForm(
+                                "tmdb_year",
+                                numberValue(e.currentTarget.value),
+                              )
+                            }
+                          />
+                        </FormField>
+                        <FormField label={t("subscription.media_type")}>
+                          <MediaTypeSelect
+                            value={form().media_type || "tv"}
+                            onChange={(value) =>
+                              updateForm("media_type", value)
+                            }
+                          />
+                        </FormField>
+                        <FormField label={t("subscription.category")}>
+                          <Input
+                            value={form().category || ""}
+                            onInput={(e) =>
+                              updateForm("category", e.currentTarget.value)
+                            }
+                          />
+                        </FormField>
+                        <FormField label={t("subscription.season")}>
+                          <Input
+                            type="number"
+                            value={form().season || 1}
+                            disabled={form().media_type === "movie"}
+                            onInput={(e) =>
+                              updateForm(
+                                "season",
+                                numberValue(e.currentTarget.value),
+                              )
+                            }
+                          />
+                        </FormField>
+                        <FormField label={t("subscription.target_root")}>
+                          <Input
+                            value={form().target_root || ""}
+                            onInput={(e) =>
+                              updateForm("target_root", e.currentTarget.value)
+                            }
+                          />
+                        </FormField>
+                        <FormField
+                          label={t("subscription.check_interval_minutes")}
+                        >
+                          <Input
+                            type="number"
+                            value={form().check_interval_minutes || 60}
+                            onInput={(e) =>
+                              updateForm(
+                                "check_interval_minutes",
+                                numberValue(e.currentTarget.value),
+                              )
+                            }
+                          />
+                        </FormField>
+                        <FormField label={t("subscription.active")}>
+                          <HopeSwitch
+                            checked={form().active ?? true}
+                            onChange={(e: {
+                              currentTarget: HTMLInputElement
+                            }) => updateForm("active", e.currentTarget.checked)}
+                          />
+                        </FormField>
+                        <FormField label={t("subscription.transfer_enabled")}>
+                          <HopeSwitch
+                            checked={form().transfer_enabled ?? true}
+                            onChange={(e: {
+                              currentTarget: HTMLInputElement
+                            }) =>
+                              updateForm(
+                                "transfer_enabled",
+                                e.currentTarget.checked,
+                              )
+                            }
+                          />
+                        </FormField>
+                        <FormField label={t("subscription.source_config")} full>
+                          <Textarea
+                            rows={8}
+                            fontFamily="monospace"
+                            value={sourceConfigText()}
+                            onInput={(e) =>
+                              setSourceConfigText(e.currentTarget.value)
+                            }
+                          />
+                        </FormField>
+                      </Box>
+                      <HStack justifyContent="flex-end">
+                        <Button
+                          colorScheme="accent"
+                          leftIcon={<AiOutlineSave />}
+                          loading={createLoading()}
+                          onClick={submitSubscription}
+                        >
+                          {t("subscription.create_subscription")}
+                        </Button>
+                      </HStack>
+                    </VStack>
+                  </Show>
                 </VStack>
               </Match>
 
@@ -652,17 +932,6 @@ export const SubscriptionManagement = () => {
                           }
                         />
                       </FormField>
-                      <FormField label={t("subscription.session_file")}>
-                        <Input
-                          value={config().telegram.session_file}
-                          onInput={(e) =>
-                            updateTelegramConfig(
-                              "session_file",
-                              e.currentTarget.value,
-                            )
-                          }
-                        />
-                      </FormField>
                       <FormField label={t("subscription.limit")}>
                         <Input
                           type="number"
@@ -670,20 +939,6 @@ export const SubscriptionManagement = () => {
                           onInput={(e) =>
                             updateTelegramConfig(
                               "limit",
-                              numberValue(e.currentTarget.value),
-                            )
-                          }
-                        />
-                      </FormField>
-                      <FormField
-                        label={t("subscription.command_timeout_seconds")}
-                      >
-                        <Input
-                          type="number"
-                          value={config().telegram.command_timeout_seconds}
-                          onInput={(e) =>
-                            updateTelegramConfig(
-                              "command_timeout_seconds",
                               numberValue(e.currentTarget.value),
                             )
                           }
@@ -697,49 +952,139 @@ export const SubscriptionManagement = () => {
                           }
                         />
                       </FormField>
-                      <FormField label={t("subscription.channels")} full>
+                      <FormField label={t("subscription.telegram_status")}>
+                        <HStack spacing="$2" flexWrap="wrap">
+                          <Badge
+                            colorScheme={
+                              telegramAuth()?.authorized ? "success" : "neutral"
+                            }
+                          >
+                            {t(
+                              telegramAuth()?.authorized
+                                ? "subscription.telegram_authorized"
+                                : "subscription.telegram_unauthorized",
+                            )}
+                          </Badge>
+                          <Show when={telegramUserLabel(telegramAuth())}>
+                            <Text color="$neutral11" fontSize="$sm">
+                              {telegramUserLabel(telegramAuth())}
+                            </Text>
+                          </Show>
+                        </HStack>
+                      </FormField>
+                      <FormField label={t("subscription.telegram_phone")}>
+                        <Input
+                          value={telegramPhone()}
+                          onInput={(e) =>
+                            setTelegramPhone(e.currentTarget.value)
+                          }
+                        />
+                      </FormField>
+                      <FormField label={t("subscription.telegram_code")}>
+                        <Input
+                          value={telegramCode()}
+                          onInput={(e) =>
+                            setTelegramCode(e.currentTarget.value)
+                          }
+                        />
+                      </FormField>
+                      <HStack
+                        gridColumn="1 / -1"
+                        justifyContent="flex-start"
+                        flexWrap="wrap"
+                        gap="$2"
+                      >
+                        <Button
+                          leftIcon={<AiOutlineReload />}
+                          loading={telegramStatusLoading()}
+                          onClick={refreshTelegramStatus}
+                        >
+                          {t("subscription.telegram_refresh_status")}
+                        </Button>
+                        <Button
+                          leftIcon={<AiOutlineSend />}
+                          loading={
+                            telegramSendCodeLoading() || saveConfigLoading()
+                          }
+                          disabled={
+                            !config().telegram.api_id ||
+                            !config().telegram.api_hash.trim() ||
+                            !telegramPhone().trim()
+                          }
+                          onClick={sendTelegramCode}
+                        >
+                          {t("subscription.telegram_send_code")}
+                        </Button>
+                        <Button
+                          colorScheme="accent"
+                          leftIcon={<AiOutlineLogin />}
+                          loading={telegramSignInLoading()}
+                          disabled={
+                            !telegramPhone().trim() ||
+                            !telegramCode().trim() ||
+                            !telegramPhoneCodeHash().trim()
+                          }
+                          onClick={signInTelegram}
+                        >
+                          {t("subscription.telegram_signin")}
+                        </Button>
+                        <Button
+                          colorScheme="danger"
+                          leftIcon={<AiOutlineLogout />}
+                          loading={telegramLogoutLoading()}
+                          onClick={logoutTelegram}
+                        >
+                          {t("subscription.telegram_logout")}
+                        </Button>
+                      </HStack>
+                      <FormField label={t("subscription.quark_channels")} full>
                         <Textarea
                           rows={3}
-                          value={joinLines(config().telegram.channels)}
+                          value={joinLines(config().telegram.quark_channels)}
                           onInput={(e) =>
                             updateTelegramConfig(
-                              "channels",
+                              "quark_channels",
                               splitLines(e.currentTarget.value),
                             )
                           }
                         />
                       </FormField>
-                      <FormField label={t("subscription.search_command")} full>
+                      <FormField
+                        label={t("subscription.aliyun_drive_channels")}
+                        full
+                      >
                         <Textarea
                           rows={3}
-                          value={joinLines(config().telegram.search_command)}
+                          value={joinLines(
+                            config().telegram.aliyun_drive_channels,
+                          )}
                           onInput={(e) =>
                             updateTelegramConfig(
-                              "search_command",
+                              "aliyun_drive_channels",
                               splitLines(e.currentTarget.value),
                             )
                           }
                         />
                       </FormField>
-                      <FormField label={t("subscription.auth_command")} full>
+                      <FormField label={t("subscription.pan123_channels")} full>
                         <Textarea
                           rows={3}
-                          value={joinLines(config().telegram.auth_command)}
+                          value={joinLines(config().telegram.pan123_channels)}
                           onInput={(e) =>
                             updateTelegramConfig(
-                              "auth_command",
+                              "pan123_channels",
                               splitLines(e.currentTarget.value),
                             )
                           }
                         />
                       </FormField>
-                      <FormField label={t("subscription.command_env")} full>
+                      <FormField label={t("subscription.pan115_channels")} full>
                         <Textarea
                           rows={3}
-                          value={joinLines(config().telegram.command_env)}
+                          value={joinLines(config().telegram.pan115_channels)}
                           onInput={(e) =>
                             updateTelegramConfig(
-                              "command_env",
+                              "pan115_channels",
                               splitLines(e.currentTarget.value),
                             )
                           }
@@ -799,30 +1144,6 @@ export const SubscriptionManagement = () => {
                           value={config().pansou.query}
                           onInput={(e) =>
                             updatePanSouConfig("query", e.currentTarget.value)
-                          }
-                        />
-                      </FormField>
-                      <FormField label={t("subscription.search_command")} full>
-                        <Textarea
-                          rows={3}
-                          value={joinLines(config().pansou.search_command)}
-                          onInput={(e) =>
-                            updatePanSouConfig(
-                              "search_command",
-                              splitLines(e.currentTarget.value),
-                            )
-                          }
-                        />
-                      </FormField>
-                      <FormField label={t("subscription.command_env")} full>
-                        <Textarea
-                          rows={3}
-                          value={joinLines(config().pansou.command_env)}
-                          onInput={(e) =>
-                            updatePanSouConfig(
-                              "command_env",
-                              splitLines(e.currentTarget.value),
-                            )
                           }
                         />
                       </FormField>
@@ -1117,6 +1438,74 @@ const SubscriptionList = (props: {
         }}
       />
     </VStack>
+  )
+}
+
+const TMDBCandidateButton = (props: {
+  candidate: ETFArchiveTMDBCandidate
+  selected: boolean
+  onSelect: (candidate: ETFArchiveTMDBCandidate) => void
+}) => {
+  const t = useT()
+  const mediaType = props.candidate.media_type === "movie" ? "movie" : "tv"
+  return (
+    <Box
+      as="button"
+      type="button"
+      w="$full"
+      p="$2"
+      border="1px solid"
+      borderColor={props.selected ? "$accent8" : "$neutral6"}
+      rounded="$md"
+      bgColor={props.selected ? "$accent3" : "$neutral2"}
+      cursor="pointer"
+      textAlign="left"
+      onClick={() => props.onSelect(props.candidate)}
+    >
+      <HStack spacing="$3" alignItems="center">
+        <Show
+          when={props.candidate.poster_url}
+          fallback={
+            <Box
+              w="3.25rem"
+              h="4.75rem"
+              rounded="$sm"
+              bgColor="$neutral5"
+              flexShrink={0}
+            />
+          }
+        >
+          <Image
+            src={props.candidate.poster_url}
+            alt={props.candidate.name}
+            w="3.25rem"
+            h="4.75rem"
+            objectFit="cover"
+            rounded="$sm"
+            flexShrink={0}
+          />
+        </Show>
+        <VStack spacing="$1" alignItems="start" minW={0}>
+          <Text fontWeight="$semibold">
+            {props.candidate.name}
+            <Show when={props.candidate.year}>{(year) => ` (${year()})`}</Show>
+          </Text>
+          <Text color="$neutral11" fontSize="$sm">
+            TMDB {props.candidate.tmdb_id} ·{" "}
+            {t(`subscription.media_types.${mediaType}`)}
+            <Show when={props.candidate.category}>
+              {" · "}
+              {props.candidate.category}
+            </Show>
+          </Text>
+          <Show when={props.candidate.original_name}>
+            <Text color="$neutral10" fontSize="$sm">
+              {props.candidate.original_name}
+            </Text>
+          </Show>
+        </VStack>
+      </HStack>
+    </Box>
   )
 }
 
