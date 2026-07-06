@@ -52,15 +52,9 @@
     "success": "成功",
     "failed": "失败"
   },
-  "config_default": "默认行为",
   "config_telegram": "Telegram",
   "config_pansou": "PanSou",
-  "config_saved_in_subscription": "这些设置保存在订阅管理内，会在新建订阅或检查订阅时自动合并。",
-  "default_target_root": "默认目标根目录",
-  "default_check_interval_minutes": "默认检查间隔",
-  "default_transfer_enabled": "默认启用转存",
-  "default_media_type": "默认媒体类型",
-  "default_category": "默认分类",
+  "config_saved_in_subscription": "这些订阅源设置保存在订阅管理内，会在新建订阅或检查订阅时自动合并。",
   "api_id": "API ID",
   "api_hash": "API Hash",
   "session_file": "Session 文件",
@@ -87,8 +81,13 @@
   "telegram_api_required": "请先填写 API ID 和 API Hash",
   "telegram_phone_required": "手机号不能为空",
   "telegram_code_required": "手机号、验证码和 phoneCodeHash 不能为空",
-  "quark_channels": "夸克网盘频道，每行一个",
-  "aliyun_drive_channels": "阿里云盘频道，每行一个",
-  "pan123_channels": "123 网盘频道，每行一个",
-  "pan115_channels": "115 网盘频道，每行一个"
+  "telegram_pan_names": {
+    "quark": "夸克网盘",
+    "aliyun_drive": "阿里云盘",
+    "pan123": "123 网盘",
+    "pan115": "115 网盘"
+  },
+  "temp_transfer_root": "临时转存文件夹",
+  "source_cleanup": "源文件清理",
+  "delete_source_after": "上传至 139 后删除源文件"
 }

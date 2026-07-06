@@ -52,15 +52,9 @@
     "success": "Success",
     "failed": "Failed"
   },
-  "config_default": "Default behavior",
   "config_telegram": "Telegram",
   "config_pansou": "PanSou",
-  "config_saved_in_subscription": "These settings are saved under subscription management and are merged into new or checked subscriptions.",
-  "default_target_root": "Default target root",
-  "default_check_interval_minutes": "Default check interval",
-  "default_transfer_enabled": "Enable transfer by default",
-  "default_media_type": "Default media type",
-  "default_category": "Default category",
+  "config_saved_in_subscription": "These source settings are saved under subscription management and are merged into new or checked subscriptions.",
   "api_id": "API ID",
   "api_hash": "API hash",
   "session_file": "Session file",
@@ -87,8 +81,13 @@
   "telegram_api_required": "Save API ID and API hash before Telegram login",
   "telegram_phone_required": "Phone number is required",
   "telegram_code_required": "Phone number, verification code, and phone code hash are required",
-  "quark_channels": "Quark channels, one per line",
-  "aliyun_drive_channels": "Aliyun Drive channels, one per line",
-  "pan123_channels": "123Pan channels, one per line",
-  "pan115_channels": "115Pan channels, one per line"
+  "telegram_pan_names": {
+    "quark": "Quark",
+    "aliyun_drive": "Aliyun Drive",
+    "pan123": "123Pan",
+    "pan115": "115Pan"
+  },
+  "temp_transfer_root": "Temporary transfer folder",
+  "source_cleanup": "Cleanup",
+  "delete_source_after": "Delete source after 139 upload"
 }

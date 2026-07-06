@@ -69,16 +69,25 @@ export interface SubscriptionTelegramSourceConfig {
   api_hash: string
   session_file: string
   channels: string[]
-  quark_channels: string[]
-  aliyun_drive_channels: string[]
-  pan123_channels: string[]
-  pan115_channels: string[]
+  quark_channels?: string[]
+  aliyun_drive_channels?: string[]
+  pan123_channels?: string[]
+  pan115_channels?: string[]
+  quark: SubscriptionTelegramPanConfig
+  aliyun_drive: SubscriptionTelegramPanConfig
+  pan123: SubscriptionTelegramPanConfig
+  pan115: SubscriptionTelegramPanConfig
   search_command: string[]
   auth_command: string[]
   command_env: string[]
   command_timeout_seconds: number
   limit: number
-  query: string
+}
+
+export interface SubscriptionTelegramPanConfig {
+  channels: string[]
+  temp_transfer_root: string
+  delete_source_after: boolean
 }
 
 export interface SubscriptionTelegramAuthResp {
@@ -107,11 +116,11 @@ export interface SubscriptionPanSouSourceConfig {
 }
 
 export interface SubscriptionConfig {
-  default_target_root: string
-  default_check_interval_minutes: number
-  default_transfer_enabled: boolean
-  default_media_type: SubscriptionMediaType
-  default_category: string
+  default_target_root?: string
+  default_check_interval_minutes?: number
+  default_transfer_enabled?: boolean
+  default_media_type?: SubscriptionMediaType
+  default_category?: string
   telegram: SubscriptionTelegramSourceConfig
   pansou: SubscriptionPanSouSourceConfig
 }

@@ -90,6 +90,15 @@ const tabItems: { key: SubscriptionTab; icon: typeof AiOutlineReload }[] = [
 
 const sourceTypes: SubscriptionSourceType[] = ["manual", "telegram", "pansou"]
 const mediaTypes: SubscriptionMediaType[] = ["tv", "movie"]
+type TelegramPanKey = "quark" | "aliyun_drive" | "pan123" | "pan115"
+type TelegramPanConfig = SubscriptionConfig["telegram"]["quark"]
+
+const telegramPanItems: { key: TelegramPanKey }[] = [
+  { key: "quark" },
+  { key: "aliyun_drive" },
+  { key: "pan123" },
+  { key: "pan115" },
+]
 
 const sourceColor: Record<
   SubscriptionSourceType,
@@ -107,22 +116,27 @@ const statusColor: Record<string, "neutral" | "info" | "success" | "danger"> = {
   failed: "danger",
 }
 
-const emptyTelegramConfig = {
+const emptyTelegramPanConfig = (): TelegramPanConfig => ({
+  channels: [],
+  temp_transfer_root: "",
+  delete_source_after: false,
+})
+
+const emptyTelegramConfig = (): SubscriptionConfig["telegram"] => ({
   api_id: 0,
   api_hash: "",
   session_file: "",
   channels: [],
-  quark_channels: [],
-  aliyun_drive_channels: [],
-  pan123_channels: [],
-  pan115_channels: [],
+  quark: emptyTelegramPanConfig(),
+  aliyun_drive: emptyTelegramPanConfig(),
+  pan123: emptyTelegramPanConfig(),
+  pan115: emptyTelegramPanConfig(),
   search_command: [],
   auth_command: [],
   command_env: [],
   command_timeout_seconds: 30,
   limit: 40,
-  query: "",
-}
+})
 
 const emptyPanSouConfig = {
   base_url: "",
@@ -133,13 +147,52 @@ const emptyPanSouConfig = {
   query: "",
 }
 
+const fillTelegramPanConfig = (
+  config?: Partial<TelegramPanConfig>,
+  legacyChannels?: string[],
+): TelegramPanConfig => {
+  const next = {
+    ...emptyTelegramPanConfig(),
+    ...(config || {}),
+  }
+  if (!Array.isArray(next.channels)) {
+    next.channels = []
+  }
+  if (next.channels.length === 0 && legacyChannels?.length) {
+    next.channels = legacyChannels
+  }
+  return next
+}
+
+const fillTelegramConfig = (
+  telegram?: Partial<SubscriptionConfig["telegram"]>,
+): SubscriptionConfig["telegram"] => {
+  const source = (telegram || {}) as Partial<SubscriptionConfig["telegram"]> & {
+    query?: string
+  }
+  const {
+    quark_channels,
+    aliyun_drive_channels,
+    pan123_channels,
+    pan115_channels,
+    query,
+    ...rest
+  } = source
+  return {
+    ...emptyTelegramConfig(),
+    ...rest,
+    quark: fillTelegramPanConfig(source.quark, quark_channels),
+    aliyun_drive: fillTelegramPanConfig(
+      source.aliyun_drive,
+      aliyun_drive_channels,
+    ),
+    pan123: fillTelegramPanConfig(source.pan123, pan123_channels),
+    pan115: fillTelegramPanConfig(source.pan115, pan115_channels),
+  }
+}
+
 const defaultConfig = (): SubscriptionConfig => ({
-  default_target_root: "",
-  default_check_interval_minutes: 60,
-  default_transfer_enabled: false,
-  default_media_type: "tv",
-  default_category: "",
-  telegram: { ...emptyTelegramConfig },
+  telegram: emptyTelegramConfig(),
   pansou: { ...emptyPanSouConfig },
 })
 
@@ -148,11 +201,10 @@ const defaultSourceConfigText = (sourceType: SubscriptionSourceType) => {
     case "telegram":
       return JSON.stringify(
         {
-          quark_channels: [],
-          aliyun_drive_channels: [],
-          pan123_channels: [],
-          pan115_channels: [],
-          query: "",
+          quark: emptyTelegramPanConfig(),
+          aliyun_drive: emptyTelegramPanConfig(),
+          pan123: emptyTelegramPanConfig(),
+          pan115: emptyTelegramPanConfig(),
         },
         null,
         2,
@@ -418,13 +470,6 @@ export const SubscriptionManagement = () => {
     })
   }
 
-  const updateConfig = <K extends keyof SubscriptionConfig>(
-    key: K,
-    value: SubscriptionConfig[K],
-  ) => {
-    setConfig((prev) => ({ ...prev, [key]: value }))
-  }
-
   const updateTelegramConfig = <K extends keyof SubscriptionConfig["telegram"]>(
     key: K,
     value: SubscriptionConfig["telegram"][K],
@@ -432,6 +477,23 @@ export const SubscriptionManagement = () => {
     setConfig((prev) => ({
       ...prev,
       telegram: { ...prev.telegram, [key]: value },
+    }))
+  }
+
+  const updateTelegramPanConfig = <K extends keyof TelegramPanConfig>(
+    panKey: TelegramPanKey,
+    key: K,
+    value: TelegramPanConfig[K],
+  ) => {
+    setConfig((prev) => ({
+      ...prev,
+      telegram: {
+        ...prev.telegram,
+        [panKey]: {
+          ...prev.telegram[panKey],
+          [key]: value,
+        },
+      },
     }))
   }
 
@@ -831,75 +893,6 @@ export const SubscriptionManagement = () => {
 
               <Match when={tab() === "config"}>
                 <VStack spacing="$5" alignItems="stretch">
-                  <ConfigSection title={t("subscription.config_default")}>
-                    <Box
-                      display="grid"
-                      gap="$3"
-                      gridTemplateColumns={{
-                        "@initial": "1fr",
-                        "@md": "repeat(2, minmax(0, 1fr))",
-                      }}
-                    >
-                      <FormField label={t("subscription.default_target_root")}>
-                        <Input
-                          value={config().default_target_root}
-                          onInput={(e) =>
-                            updateConfig(
-                              "default_target_root",
-                              e.currentTarget.value,
-                            )
-                          }
-                        />
-                      </FormField>
-                      <FormField
-                        label={t("subscription.default_check_interval_minutes")}
-                      >
-                        <Input
-                          type="number"
-                          value={config().default_check_interval_minutes}
-                          onInput={(e) =>
-                            updateConfig(
-                              "default_check_interval_minutes",
-                              numberValue(e.currentTarget.value),
-                            )
-                          }
-                        />
-                      </FormField>
-                      <FormField label={t("subscription.default_media_type")}>
-                        <MediaTypeSelect
-                          value={config().default_media_type}
-                          onChange={(value) =>
-                            updateConfig("default_media_type", value)
-                          }
-                        />
-                      </FormField>
-                      <FormField label={t("subscription.default_category")}>
-                        <Input
-                          value={config().default_category}
-                          onInput={(e) =>
-                            updateConfig(
-                              "default_category",
-                              e.currentTarget.value,
-                            )
-                          }
-                        />
-                      </FormField>
-                      <FormField
-                        label={t("subscription.default_transfer_enabled")}
-                      >
-                        <HopeSwitch
-                          checked={config().default_transfer_enabled}
-                          onChange={(e: { currentTarget: HTMLInputElement }) =>
-                            updateConfig(
-                              "default_transfer_enabled",
-                              e.currentTarget.checked,
-                            )
-                          }
-                        />
-                      </FormField>
-                    </Box>
-                  </ConfigSection>
-
                   <ConfigSection title={t("subscription.config_telegram")}>
                     <Box
                       display="grid"
@@ -944,14 +937,6 @@ export const SubscriptionManagement = () => {
                           }
                         />
                       </FormField>
-                      <FormField label={t("subscription.query")}>
-                        <Input
-                          value={config().telegram.query}
-                          onInput={(e) =>
-                            updateTelegramConfig("query", e.currentTarget.value)
-                          }
-                        />
-                      </FormField>
                       <FormField label={t("subscription.telegram_status")}>
                         <HStack spacing="$2" flexWrap="wrap">
                           <Badge
@@ -972,22 +957,24 @@ export const SubscriptionManagement = () => {
                           </Show>
                         </HStack>
                       </FormField>
-                      <FormField label={t("subscription.telegram_phone")}>
-                        <Input
-                          value={telegramPhone()}
-                          onInput={(e) =>
-                            setTelegramPhone(e.currentTarget.value)
-                          }
-                        />
-                      </FormField>
-                      <FormField label={t("subscription.telegram_code")}>
-                        <Input
-                          value={telegramCode()}
-                          onInput={(e) =>
-                            setTelegramCode(e.currentTarget.value)
-                          }
-                        />
-                      </FormField>
+                      <Show when={!telegramAuth()?.authorized}>
+                        <FormField label={t("subscription.telegram_phone")}>
+                          <Input
+                            value={telegramPhone()}
+                            onInput={(e) =>
+                              setTelegramPhone(e.currentTarget.value)
+                            }
+                          />
+                        </FormField>
+                        <FormField label={t("subscription.telegram_code")}>
+                          <Input
+                            value={telegramCode()}
+                            onInput={(e) =>
+                              setTelegramCode(e.currentTarget.value)
+                            }
+                          />
+                        </FormField>
+                      </Show>
                       <HStack
                         gridColumn="1 / -1"
                         justifyContent="flex-start"
@@ -1001,95 +988,57 @@ export const SubscriptionManagement = () => {
                         >
                           {t("subscription.telegram_refresh_status")}
                         </Button>
-                        <Button
-                          leftIcon={<AiOutlineSend />}
-                          loading={
-                            telegramSendCodeLoading() || saveConfigLoading()
-                          }
-                          disabled={
-                            !config().telegram.api_id ||
-                            !config().telegram.api_hash.trim() ||
-                            !telegramPhone().trim()
-                          }
-                          onClick={sendTelegramCode}
-                        >
-                          {t("subscription.telegram_send_code")}
-                        </Button>
-                        <Button
-                          colorScheme="accent"
-                          leftIcon={<AiOutlineLogin />}
-                          loading={telegramSignInLoading()}
-                          disabled={
-                            !telegramPhone().trim() ||
-                            !telegramCode().trim() ||
-                            !telegramPhoneCodeHash().trim()
-                          }
-                          onClick={signInTelegram}
-                        >
-                          {t("subscription.telegram_signin")}
-                        </Button>
-                        <Button
-                          colorScheme="danger"
-                          leftIcon={<AiOutlineLogout />}
-                          loading={telegramLogoutLoading()}
-                          onClick={logoutTelegram}
-                        >
-                          {t("subscription.telegram_logout")}
-                        </Button>
+                        <Show when={!telegramAuth()?.authorized}>
+                          <Button
+                            leftIcon={<AiOutlineSend />}
+                            loading={
+                              telegramSendCodeLoading() || saveConfigLoading()
+                            }
+                            disabled={
+                              !config().telegram.api_id ||
+                              !config().telegram.api_hash.trim() ||
+                              !telegramPhone().trim()
+                            }
+                            onClick={sendTelegramCode}
+                          >
+                            {t("subscription.telegram_send_code")}
+                          </Button>
+                          <Button
+                            colorScheme="accent"
+                            leftIcon={<AiOutlineLogin />}
+                            loading={telegramSignInLoading()}
+                            disabled={
+                              !telegramPhone().trim() ||
+                              !telegramCode().trim() ||
+                              !telegramPhoneCodeHash().trim()
+                            }
+                            onClick={signInTelegram}
+                          >
+                            {t("subscription.telegram_signin")}
+                          </Button>
+                        </Show>
+                        <Show when={telegramAuth()?.authorized}>
+                          <Button
+                            colorScheme="danger"
+                            leftIcon={<AiOutlineLogout />}
+                            loading={telegramLogoutLoading()}
+                            onClick={logoutTelegram}
+                          >
+                            {t("subscription.telegram_logout")}
+                          </Button>
+                        </Show>
                       </HStack>
-                      <FormField label={t("subscription.quark_channels")} full>
-                        <Textarea
-                          rows={3}
-                          value={joinLines(config().telegram.quark_channels)}
-                          onInput={(e) =>
-                            updateTelegramConfig(
-                              "quark_channels",
-                              splitLines(e.currentTarget.value),
-                            )
-                          }
-                        />
-                      </FormField>
-                      <FormField
-                        label={t("subscription.aliyun_drive_channels")}
-                        full
-                      >
-                        <Textarea
-                          rows={3}
-                          value={joinLines(
-                            config().telegram.aliyun_drive_channels,
-                          )}
-                          onInput={(e) =>
-                            updateTelegramConfig(
-                              "aliyun_drive_channels",
-                              splitLines(e.currentTarget.value),
-                            )
-                          }
-                        />
-                      </FormField>
-                      <FormField label={t("subscription.pan123_channels")} full>
-                        <Textarea
-                          rows={3}
-                          value={joinLines(config().telegram.pan123_channels)}
-                          onInput={(e) =>
-                            updateTelegramConfig(
-                              "pan123_channels",
-                              splitLines(e.currentTarget.value),
-                            )
-                          }
-                        />
-                      </FormField>
-                      <FormField label={t("subscription.pan115_channels")} full>
-                        <Textarea
-                          rows={3}
-                          value={joinLines(config().telegram.pan115_channels)}
-                          onInput={(e) =>
-                            updateTelegramConfig(
-                              "pan115_channels",
-                              splitLines(e.currentTarget.value),
-                            )
-                          }
-                        />
-                      </FormField>
+                      <For each={telegramPanItems}>
+                        {(item) => (
+                          <TelegramPanConfigFields
+                            panKey={item.key}
+                            value={config().telegram[item.key]}
+                            onChange={(key, value) =>
+                              updateTelegramPanConfig(item.key, key, value)
+                            }
+                          />
+                        )}
+                      </For>
                     </Box>
                   </ConfigSection>
 
@@ -1591,15 +1540,89 @@ const ConfigSection = (props: { title: string; children: JSXElement }) => {
   )
 }
 
-const fillConfig = (config: SubscriptionConfig): SubscriptionConfig => ({
-  ...defaultConfig(),
-  ...config,
-  telegram: {
-    ...emptyTelegramConfig,
-    ...(config.telegram || {}),
-  },
-  pansou: {
-    ...emptyPanSouConfig,
-    ...(config.pansou || {}),
-  },
-})
+const TelegramPanConfigFields = (props: {
+  panKey: TelegramPanKey
+  value: TelegramPanConfig
+  onChange: <K extends keyof TelegramPanConfig>(
+    key: K,
+    value: TelegramPanConfig[K],
+  ) => void
+}) => {
+  const t = useT()
+  const border = useColorModeValue("$neutral5", "$neutral7")
+  const panelBg = useColorModeValue("$neutral1", "$neutral3")
+  return (
+    <Box
+      gridColumn="1 / -1"
+      border="1px solid"
+      borderColor={border()}
+      rounded="$md"
+      bgColor={panelBg()}
+      p="$3"
+    >
+      <VStack spacing="$3" alignItems="stretch">
+        <Text fontWeight="$semibold">
+          {t(`subscription.telegram_pan_names.${props.panKey}`)}
+        </Text>
+        <FormField label={t("subscription.channels")}>
+          <Textarea
+            rows={3}
+            value={joinLines(props.value.channels)}
+            onInput={(e) =>
+              props.onChange("channels", splitLines(e.currentTarget.value))
+            }
+          />
+        </FormField>
+        <Box
+          display="grid"
+          gap="$3"
+          gridTemplateColumns={{
+            "@initial": "1fr",
+            "@md": "minmax(0, 1fr) auto",
+          }}
+          alignItems="end"
+        >
+          <FormField label={t("subscription.temp_transfer_root")}>
+            <Input
+              value={props.value.temp_transfer_root}
+              onInput={(e) =>
+                props.onChange("temp_transfer_root", e.currentTarget.value)
+              }
+            />
+          </FormField>
+          <FormControl display="flex" flexDirection="column">
+            <FormLabel>{t("subscription.source_cleanup")}</FormLabel>
+            <HopeSwitch
+              checked={props.value.delete_source_after}
+              onChange={(e: { currentTarget: HTMLInputElement }) =>
+                props.onChange("delete_source_after", e.currentTarget.checked)
+              }
+            >
+              {t("subscription.delete_source_after")}
+            </HopeSwitch>
+          </FormControl>
+        </Box>
+      </VStack>
+    </Box>
+  )
+}
+
+const fillConfig = (config: SubscriptionConfig): SubscriptionConfig => {
+  const {
+    default_target_root,
+    default_check_interval_minutes,
+    default_transfer_enabled,
+    default_media_type,
+    default_category,
+    ...rest
+  } = config
+  return {
+    ...defaultConfig(),
+    ...rest,
+    telegram: fillTelegramConfig(config.telegram),
+    pansou: {
+      ...emptyPanSouConfig,
+      ...(config.pansou || {}),
+    },
+  }
+}
