@@ -196,42 +196,10 @@ const fillTelegramConfig = (
 }
 
 const defaultConfig = (): SubscriptionConfig => ({
+  default_target_root: "",
   telegram: emptyTelegramConfig(),
   pansou: { ...emptyPanSouConfig },
 })
-
-const defaultSourceConfigText = (sourceType: SubscriptionSourceType) => {
-  switch (sourceType) {
-    case "telegram":
-      return JSON.stringify(
-        {
-          quark: emptyTelegramPanConfig(),
-          aliyun_drive: emptyTelegramPanConfig(),
-          pan123: emptyTelegramPanConfig(),
-          pan115: emptyTelegramPanConfig(),
-        },
-        null,
-        2,
-      )
-    case "pansou":
-      return JSON.stringify(
-        {
-          query: "",
-        },
-        null,
-        2,
-      )
-    default:
-      return JSON.stringify(
-        {
-          paths: ["/"],
-          links: [],
-        },
-        null,
-        2,
-      )
-  }
-}
 
 const splitLines = (value: string) =>
   value
@@ -288,9 +256,7 @@ export const SubscriptionManagement = () => {
   const [records, setRecords] = createSignal<Subscription[]>([])
   const [formSourceType, setFormSourceType] =
     createSignal<SubscriptionSourceType>("manual")
-  const [sourceConfigText, setSourceConfigText] = createSignal(
-    defaultSourceConfigText("manual"),
-  )
+  const [manualLinksText, setManualLinksText] = createSignal("")
   const [form, setForm] = createSignal<Partial<Subscription>>({
     active: true,
     check_interval_minutes: 60,
@@ -362,7 +328,6 @@ export const SubscriptionManagement = () => {
   const selectSourceType = (value: SubscriptionSourceType) => {
     setFormSourceType(value)
     setForm((prev) => ({ ...prev, source_type: value }))
-    setSourceConfigText(defaultSourceConfigText(value))
   }
 
   const searchTMDBCandidates = async () => {
@@ -409,7 +374,7 @@ export const SubscriptionManagement = () => {
 
   const resetCreateForm = () => {
     setFormSourceType("manual")
-    setSourceConfigText(defaultSourceConfigText("manual"))
+    setManualLinksText("")
     setForm({
       active: true,
       check_interval_minutes: 60,
@@ -429,22 +394,28 @@ export const SubscriptionManagement = () => {
     setForm((prev) => ({ ...prev, [key]: value }))
   }
 
+  const updateConfig = <K extends keyof SubscriptionConfig>(
+    key: K,
+    value: SubscriptionConfig[K],
+  ) => {
+    setConfig((prev) => ({ ...prev, [key]: value }))
+  }
+
   const submitSubscription = async () => {
-    const rawSourceConfig = sourceConfigText().trim()
-    if (rawSourceConfig) {
-      try {
-        JSON.parse(rawSourceConfig)
-      } catch {
-        notify.error(t("subscription.invalid_source_config"))
-        return
-      }
+    const manualLinks = splitLines(manualLinksText())
+    if (formSourceType() === "manual" && manualLinks.length === 0) {
+      notify.warning(t("subscription.manual_links_required"))
+      return
     }
+    const sourceConfig =
+      formSourceType() === "manual"
+        ? JSON.stringify({ links: manualLinks })
+        : ""
     const payload: Partial<Subscription> = {
       ...form(),
       source_type: formSourceType(),
-      source_config: rawSourceConfig,
+      source_config: sourceConfig,
       name: form().name?.trim(),
-      target_root: form().target_root?.trim(),
       tmdb_name: form().tmdb_name?.trim(),
       category: form().category?.trim(),
     }
@@ -826,14 +797,6 @@ export const SubscriptionManagement = () => {
                             }
                           />
                         </FormField>
-                        <FormField label={t("subscription.target_root")}>
-                          <Input
-                            value={form().target_root || ""}
-                            onInput={(e) =>
-                              updateForm("target_root", e.currentTarget.value)
-                            }
-                          />
-                        </FormField>
                         <FormField
                           label={t("subscription.check_interval_minutes")}
                         >
@@ -869,16 +832,23 @@ export const SubscriptionManagement = () => {
                             }
                           />
                         </FormField>
-                        <FormField label={t("subscription.source_config")} full>
-                          <Textarea
-                            rows={8}
-                            fontFamily="monospace"
-                            value={sourceConfigText()}
-                            onInput={(e) =>
-                              setSourceConfigText(e.currentTarget.value)
-                            }
-                          />
-                        </FormField>
+                        <Show when={formSourceType() === "manual"}>
+                          <FormField
+                            label={t("subscription.manual_links")}
+                            full
+                          >
+                            <Textarea
+                              rows={6}
+                              value={manualLinksText()}
+                              placeholder={t(
+                                "subscription.manual_links_placeholder",
+                              )}
+                              onInput={(e) =>
+                                setManualLinksText(e.currentTarget.value)
+                              }
+                            />
+                          </FormField>
+                        </Show>
                       </Box>
                       <HStack justifyContent="flex-end">
                         <Button
@@ -897,6 +867,29 @@ export const SubscriptionManagement = () => {
 
               <Match when={tab() === "config"}>
                 <VStack spacing="$5" alignItems="stretch">
+                  <ConfigSection title={t("subscription.config_general")}>
+                    <Box
+                      display="grid"
+                      gap="$3"
+                      gridTemplateColumns={{
+                        "@initial": "1fr",
+                        "@md": "repeat(2, minmax(0, 1fr))",
+                      }}
+                    >
+                      <FormField label={t("subscription.default_target_root")}>
+                        <Input
+                          value={config().default_target_root || ""}
+                          onInput={(e) =>
+                            updateConfig(
+                              "default_target_root",
+                              e.currentTarget.value,
+                            )
+                          }
+                        />
+                      </FormField>
+                    </Box>
+                  </ConfigSection>
+
                   <ConfigSection title={t("subscription.config_telegram")}>
                     <Box
                       display="grid"
@@ -1641,7 +1634,6 @@ const TelegramPanConfigFields = (props: {
 
 const fillConfig = (config: SubscriptionConfig): SubscriptionConfig => {
   const {
-    default_target_root,
     default_check_interval_minutes,
     default_transfer_enabled,
     default_media_type,

@@ -133,6 +133,20 @@ export const side_menu_items: SideMenuItem[] = [
       //   component: lazy(() => import("./tasks/Qbit")),
       // },
       {
+        title: "manage.sidemenu.resource_search",
+        icon: BsSearch,
+        to: "/@manage/tasks/resource_search",
+        role: UserRole.GENERAL,
+        component: lazy(() => import("./subscription/ResourceSearch")),
+      },
+      {
+        title: "manage.sidemenu.transfer_tasks",
+        icon: BsArrowLeftRight,
+        to: "/@manage/tasks/transfer_tasks",
+        role: UserRole.GENERAL,
+        component: lazy(() => import("./subscription/TransferTasks")),
+      },
+      {
         title: "manage.sidemenu.upload",
         icon: BsCloudUploadFill,
         to: "/@manage/tasks/upload",

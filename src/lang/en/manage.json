@@ -25,6 +25,8 @@
     "sso": "Single Sign-On",
     "docs": "Documentation",
     "offline_download": "Offline Download",
+    "resource_search": "Resource Search",
+    "transfer_tasks": "Transfer Tasks",
     "ldap": "LDAP",
     "s3": "S3",
     "ftp": "FTP",

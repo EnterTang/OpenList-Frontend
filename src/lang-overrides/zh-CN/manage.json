@@ -1,5 +1,7 @@
 {
   "sidemenu": {
-    "etf_archive": "ETF 归档任务"
+    "etf_archive": "ETF 归档任务",
+    "resource_search": "资源搜索",
+    "transfer_tasks": "转存任务"
   }
 }

@@ -21,7 +21,10 @@ import {
   Subscription,
   SubscriptionConfig,
   SubscriptionTelegramAuthResp,
+  SubscriptionRun,
   SubscriptionRunResult,
+  SubscriptionResourceSearchResp,
+  SubscriptionSourceType,
 } from "~/types"
 import { r } from "."
 
@@ -393,6 +396,29 @@ export const subscriptionCheck = (
   transfer = false,
 ): PResp<SubscriptionRunResult> => {
   return r.post("/admin/subscription/check", { id, transfer })
+}
+
+export const subscriptionRuns = (
+  params: {
+    subscription_id?: number
+    status?: string
+    page?: number
+    per_page?: number
+  } = {},
+): PPageResp<SubscriptionRun> => {
+  return r.get("/admin/subscription/runs", { params })
+}
+
+export const subscriptionResourceSearch = (
+  query: string,
+  sources: SubscriptionSourceType[] = ["telegram", "pansou"],
+  limit = 40,
+): PResp<SubscriptionResourceSearchResp> => {
+  return r.post("/admin/subscription/resource/search", {
+    query,
+    sources,
+    limit,
+  })
 }
 
 export const subscriptionConfigGet = (): PResp<SubscriptionConfig> => {

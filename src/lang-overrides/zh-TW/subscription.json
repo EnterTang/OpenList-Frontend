@@ -1,0 +1,20 @@
+{
+  "default_target_root": "默認目標根目錄",
+  "manual_links": "分享鏈接",
+  "manual_links_placeholder": "每行一個分享鏈接，支持夸克、123、115 等",
+  "manual_links_required": "請至少填寫一條分享鏈接",
+  "config_general": "通用",
+  "resource_search_placeholder": "輸入片名、劇名或關鍵詞",
+  "resource_search_limit_suffix": " 條",
+  "resource_search_source_required": "請至少選擇一個來源",
+  "resource_title": "資源",
+  "resource_links": "分享鏈接",
+  "resource_date": "時間",
+  "transfer_tasks_overview": "訂閱與執行概覽",
+  "run_subscription": "訂閱",
+  "run_counts": "新增 / 變更 / 轉存",
+  "run_time": "開始 / 結束時間",
+  "run_added": "新增",
+  "run_changed": "變更",
+  "run_transferred": "轉存"
+}

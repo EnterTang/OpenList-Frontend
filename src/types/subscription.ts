@@ -64,6 +64,29 @@ export interface SubscriptionRunResult {
   items: SubscriptionItem[]
 }
 
+export interface SubscriptionResourceSearchLink {
+  url: string
+  provider?: string
+}
+
+export interface SubscriptionResourceSearchResult {
+  source_type: SubscriptionSourceType
+  provider?: string
+  title: string
+  content?: string
+  channel?: string
+  message_url?: string
+  date?: string
+  links?: SubscriptionResourceSearchLink[]
+}
+
+export interface SubscriptionResourceSearchResp {
+  query: string
+  sources: SubscriptionSourceType[]
+  results: SubscriptionResourceSearchResult[]
+  source_errors?: Partial<Record<SubscriptionSourceType, string>>
+}
+
 export interface SubscriptionTelegramSourceConfig {
   api_id: number
   api_hash: string
