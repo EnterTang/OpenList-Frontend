@@ -88,6 +88,10 @@ export interface SubscriptionTelegramPanConfig {
   channels: string[]
   temp_transfer_root: string
   delete_source_after: boolean
+  cookie?: string
+  refresh_token?: string
+  access_token?: string
+  drive_id?: string
 }
 
 export interface SubscriptionTelegramAuthResp {

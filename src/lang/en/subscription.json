@@ -88,6 +88,8 @@
     "pan115": "115Pan"
   },
   "temp_transfer_root": "Temporary transfer folder",
+  "aliyun_web_refresh_token": "Aliyun Web refresh token",
+  "aliyun_drive_id": "Aliyun drive ID",
   "source_cleanup": "Cleanup",
   "delete_source_after": "Delete source after 139 upload"
 }

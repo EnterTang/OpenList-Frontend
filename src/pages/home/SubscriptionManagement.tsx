@@ -120,6 +120,10 @@ const emptyTelegramPanConfig = (): TelegramPanConfig => ({
   channels: [],
   temp_transfer_root: "",
   delete_source_after: false,
+  cookie: "",
+  refresh_token: "",
+  access_token: "",
+  drive_id: "",
 })
 
 const emptyTelegramConfig = (): SubscriptionConfig["telegram"] => ({
@@ -1573,6 +1577,34 @@ const TelegramPanConfigFields = (props: {
             }
           />
         </FormField>
+        <Show when={props.panKey === "aliyun_drive"}>
+          <Box
+            display="grid"
+            gap="$3"
+            gridTemplateColumns={{
+              "@initial": "1fr",
+              "@md": "minmax(0, 2fr) minmax(0, 1fr)",
+            }}
+          >
+            <FormField label={t("subscription.aliyun_web_refresh_token")}>
+              <Textarea
+                rows={3}
+                value={props.value.refresh_token || ""}
+                onInput={(e) =>
+                  props.onChange("refresh_token", e.currentTarget.value)
+                }
+              />
+            </FormField>
+            <FormField label={t("subscription.aliyun_drive_id")}>
+              <Input
+                value={props.value.drive_id || ""}
+                onInput={(e) =>
+                  props.onChange("drive_id", e.currentTarget.value)
+                }
+              />
+            </FormField>
+          </Box>
+        </Show>
         <Box
           display="grid"
           gap="$3"

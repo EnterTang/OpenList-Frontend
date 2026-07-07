@@ -333,7 +333,9 @@
       "trash": "Trash"
     },
     "root_folder_id": "Root folder id",
-    "use_online_api": "Use online api"
+    "use_online_api": "Use online api",
+    "web_refresh_token": "Web refresh token",
+    "web_refresh_token-tips": "Aliyun web refresh token used by subscription share transfer; this is different from the OpenAPI refresh token"
   },
   "AliyundriveShare": {
     "order_by": "Order by",
