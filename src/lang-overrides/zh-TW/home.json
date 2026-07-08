@@ -4,7 +4,9 @@
     "collapse": "收起側邊欄",
     "netdisk": "網盤管理",
     "subscriptions": "訂閱管理",
-    "mobile_share": "移動分享管理"
+    "mobile_share": "移動分享管理",
+    "resource_search": "訂閱源搜尋",
+    "task_board": "任務看板"
   },
   "toolbar": {
     "mobile_share": "建立移動分享連結",

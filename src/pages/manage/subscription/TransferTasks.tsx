@@ -15,7 +15,8 @@ import {
 } from "@hope-ui/solid"
 import { AiOutlineReload } from "solid-icons/ai"
 import { createSignal, For, onMount, Show } from "solid-js"
-import { useFetch, useManageTitle, useT } from "~/hooks"
+import { useFetch, useT, useTitle } from "~/hooks"
+import { getSetting } from "~/store"
 import { Subscription, SubscriptionRun, SubscriptionStatus } from "~/types"
 import { handleResp, subscriptionList, subscriptionRuns } from "~/utils"
 import { TypeTasks } from "../tasks/Tasks"
@@ -35,7 +36,10 @@ const statusColor: Record<
   failed: "danger",
 }
 
-const TransferTasks = () => {
+const TransferTasks = (props: {
+  titleKey?: string
+  titleMode?: "manage" | "site"
+}) => {
   const t = useT()
   const border = useColorModeValue("$neutral5", "$neutral7")
   const panelBg = useColorModeValue("white", "$neutral3")
@@ -47,7 +51,14 @@ const TransferTasks = () => {
   const [runsLoading, loadRuns] = useFetch(() =>
     subscriptionRuns({ page: 1, per_page: 30 }),
   )
-  useManageTitle("manage.sidemenu.transfer_tasks")
+  useTitle(
+    () =>
+      `${t(props.titleKey || "manage.sidemenu.transfer_tasks")} | ${
+        props.titleMode === "site"
+          ? getSetting("site_title")
+          : t("manage.title")
+      }`,
+  )
 
   const refresh = async () => {
     const subsResp = await loadSubscriptions()

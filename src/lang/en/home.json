@@ -64,7 +64,9 @@
     "collapse": "Collapse sidebar",
     "netdisk": "Drive management",
     "subscriptions": "Subscription management",
-    "mobile_share": "Mobile share management"
+    "mobile_share": "Mobile share management",
+    "resource_search": "Subscription source search",
+    "task_board": "Task board"
   },
   "no_images": "No images in the current folder",
   "load_more": "Load more",

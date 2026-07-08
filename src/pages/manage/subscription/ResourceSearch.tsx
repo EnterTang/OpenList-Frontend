@@ -26,7 +26,8 @@ import {
 } from "@hope-ui/solid"
 import { AiOutlineSearch } from "solid-icons/ai"
 import { createSignal, For, Show } from "solid-js"
-import { useFetch, useManageTitle, useT } from "~/hooks"
+import { useFetch, useT, useTitle } from "~/hooks"
+import { getSetting } from "~/store"
 import {
   SubscriptionResourceSearchResult,
   SubscriptionSourceType,
@@ -51,7 +52,10 @@ const sourceColor: Record<SubscriptionSourceType, "info" | "accent"> = {
   manual: "info",
 }
 
-const ResourceSearch = () => {
+const ResourceSearch = (props: {
+  titleKey?: string
+  titleMode?: "manage" | "site"
+}) => {
   const t = useT()
   const border = useColorModeValue("$neutral5", "$neutral7")
   const panelBg = useColorModeValue("white", "$neutral3")
@@ -72,7 +76,14 @@ const ResourceSearch = () => {
       Number(limit()) || 40,
     ),
   )
-  useManageTitle("manage.sidemenu.resource_search")
+  useTitle(
+    () =>
+      `${t(props.titleKey || "manage.sidemenu.resource_search")} | ${
+        props.titleMode === "site"
+          ? getSetting("site_title")
+          : t("manage.title")
+      }`,
+  )
 
   const toggleSource = (source: SubscriptionSourceType, checked: boolean) => {
     setSources((prev) => {
