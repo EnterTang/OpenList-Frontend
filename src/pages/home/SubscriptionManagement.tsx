@@ -2,6 +2,7 @@ import {
   Badge,
   Box,
   Button,
+  Checkbox,
   FormControl,
   FormLabel,
   HStack,
@@ -214,6 +215,17 @@ const numberValue = (value: string) => {
   return Number.isFinite(parsed) ? parsed : 0
 }
 
+const seasonNumbersFromCandidate = (candidate: ETFArchiveTMDBCandidate) => {
+  const seasons = Array.isArray(candidate.seasons) ? candidate.seasons : []
+  const fromSeasons = seasons.map((season) => Number(season.season_number))
+  const fromMap = Object.keys(candidate.season_map || {}).map((season) =>
+    Number(season),
+  )
+  return Array.from(new Set([...fromSeasons, ...fromMap]))
+    .filter((season) => Number.isFinite(season) && season > 0)
+    .sort((a, b) => a - b)
+}
+
 const telegramUserLabel = (status?: SubscriptionTelegramAuthResp) => {
   const user = status?.user
   if (!status?.authorized || !user) return ""
@@ -255,7 +267,7 @@ export const SubscriptionManagement = () => {
   const [total, setTotal] = createSignal(0)
   const [records, setRecords] = createSignal<Subscription[]>([])
   const [formSourceType, setFormSourceType] =
-    createSignal<SubscriptionSourceType>("manual")
+    createSignal<SubscriptionSourceType>("telegram")
   const [manualLinksText, setManualLinksText] = createSignal("")
   const [form, setForm] = createSignal<Partial<Subscription>>({
     active: true,
@@ -263,7 +275,9 @@ export const SubscriptionManagement = () => {
     transfer_enabled: true,
     media_type: "tv",
     season: 1,
+    seasons: [],
   })
+  const [seasonOptions, setSeasonOptions] = createSignal<number[]>([])
   const [tmdbQuery, setTMDBQuery] = createSignal("")
   const [tmdbCandidates, setTMDBCandidates] = createSignal<
     ETFArchiveTMDBCandidate[]
@@ -343,9 +357,12 @@ export const SubscriptionManagement = () => {
   const selectTMDBCandidate = (candidate: ETFArchiveTMDBCandidate) => {
     const mediaType: SubscriptionMediaType =
       candidate.media_type === "movie" ? "movie" : "tv"
+    const seasons =
+      mediaType === "tv" ? seasonNumbersFromCandidate(candidate) : []
     setSelectedTMDBCandidate(candidate)
     setTMDBQuery(candidate.name)
     setTMDBCandidates([])
+    setSeasonOptions(seasons)
     setForm((prev) => ({
       ...prev,
       name: candidate.name,
@@ -354,13 +371,15 @@ export const SubscriptionManagement = () => {
       tmdb_year: candidate.year || 0,
       media_type: mediaType,
       category: candidate.category || prev.category || "",
-      season: mediaType === "tv" ? prev.season || 1 : 0,
+      season: mediaType === "tv" ? seasons[0] || prev.season || 1 : 0,
+      seasons: mediaType === "tv" ? seasons : [],
     }))
   }
 
   const clearSelectedTMDBCandidate = () => {
     setSelectedTMDBCandidate(undefined)
     setTMDBCandidates([])
+    setSeasonOptions([])
     setForm((prev) => ({
       ...prev,
       name: "",
@@ -369,11 +388,12 @@ export const SubscriptionManagement = () => {
       tmdb_year: 0,
       category: "",
       season: 1,
+      seasons: [],
     }))
   }
 
   const resetCreateForm = () => {
-    setFormSourceType("manual")
+    setFormSourceType("telegram")
     setManualLinksText("")
     setForm({
       active: true,
@@ -381,7 +401,9 @@ export const SubscriptionManagement = () => {
       transfer_enabled: true,
       media_type: "tv",
       season: 1,
+      seasons: [],
     })
+    setSeasonOptions([])
     setTMDBQuery("")
     setTMDBCandidates([])
     setSelectedTMDBCandidate(undefined)
@@ -392,6 +414,52 @@ export const SubscriptionManagement = () => {
     value: Subscription[K],
   ) => {
     setForm((prev) => ({ ...prev, [key]: value }))
+  }
+
+  const selectedSeasons = () => {
+    const seasons = form().seasons
+    if (Array.isArray(seasons)) return seasons
+    return form().season ? [form().season || 1] : []
+  }
+
+  const toggleSeason = (season: number, checked: boolean) => {
+    const next = new Set(selectedSeasons())
+    if (checked) {
+      next.add(season)
+    } else if (next.size > 1) {
+      next.delete(season)
+    }
+    const seasons = Array.from(next)
+      .filter((item) => item > 0)
+      .sort((a, b) => a - b)
+    setForm((prev) => ({
+      ...prev,
+      seasons,
+      season: seasons[0] || prev.season || 1,
+    }))
+  }
+
+  const updateMediaType = (value: SubscriptionMediaType) => {
+    if (value === "movie") {
+      setForm((prev) => ({
+        ...prev,
+        media_type: value,
+        season: 0,
+        seasons: [],
+      }))
+      return
+    }
+    const seasons = selectedSeasons().length
+      ? selectedSeasons()
+      : seasonOptions().length
+        ? seasonOptions()
+        : [form().season || 1]
+    setForm((prev) => ({
+      ...prev,
+      media_type: value,
+      season: seasons[0] || 1,
+      seasons,
+    }))
   }
 
   const updateConfig = <K extends keyof SubscriptionConfig>(
@@ -771,9 +839,7 @@ export const SubscriptionManagement = () => {
                         <FormField label={t("subscription.media_type")}>
                           <MediaTypeSelect
                             value={form().media_type || "tv"}
-                            onChange={(value) =>
-                              updateForm("media_type", value)
-                            }
+                            onChange={updateMediaType}
                           />
                         </FormField>
                         <FormField label={t("subscription.category")}>
@@ -785,17 +851,44 @@ export const SubscriptionManagement = () => {
                           />
                         </FormField>
                         <FormField label={t("subscription.season")}>
-                          <Input
-                            type="number"
-                            value={form().season || 1}
-                            disabled={form().media_type === "movie"}
-                            onInput={(e) =>
-                              updateForm(
-                                "season",
-                                numberValue(e.currentTarget.value),
-                              )
+                          <Show
+                            when={form().media_type !== "movie"}
+                            fallback={
+                              <Input type="number" value={0} disabled />
                             }
-                          />
+                          >
+                            <HStack spacing="$2" gap="$2" flexWrap="wrap">
+                              <For
+                                each={
+                                  seasonOptions().length
+                                    ? seasonOptions()
+                                    : [form().season || 1]
+                                }
+                              >
+                                {(season) => {
+                                  const checked = () =>
+                                    selectedSeasons().includes(season)
+                                  return (
+                                    <Checkbox
+                                      checked={checked()}
+                                      disabled={
+                                        checked() &&
+                                        selectedSeasons().length === 1
+                                      }
+                                      onChange={(e) =>
+                                        toggleSeason(
+                                          season,
+                                          e.currentTarget.checked,
+                                        )
+                                      }
+                                    >
+                                      S{String(season).padStart(2, "0")}
+                                    </Checkbox>
+                                  )
+                                }}
+                              </For>
+                            </HStack>
+                          </Show>
                         </FormField>
                         <FormField
                           label={t("subscription.check_interval_minutes")}

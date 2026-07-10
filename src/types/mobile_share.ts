@@ -25,3 +25,8 @@ export interface MobileShareCreateResult {
   existing: boolean
   requires_confirm: boolean
 }
+
+export interface MobileShareDeleteResult {
+  records: MobileShareRecord[]
+  deleted: number
+}

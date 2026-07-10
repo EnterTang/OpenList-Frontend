@@ -19,6 +19,7 @@ export interface Subscription {
   media_type: SubscriptionMediaType
   category: string
   season: number
+  seasons?: number[]
   last_checked_at?: string
   last_cursor: string
   last_tree_hash: string

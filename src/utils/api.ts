@@ -17,6 +17,7 @@ import {
   ETFManualArchiveMetadata,
   ETFManualArchivePreview,
   MobileShareCreateResult,
+  MobileShareDeleteResult,
   MobileShareRecord,
   Subscription,
   SubscriptionConfig,
@@ -367,6 +368,12 @@ export const mobileShareList = (
   } = {},
 ): PPageResp<MobileShareRecord> => {
   return r.get("/admin/mobile_share/list", { params })
+}
+
+export const mobileShareDelete = (
+  id: number,
+): PResp<MobileShareDeleteResult> => {
+  return r.post("/admin/mobile_share/delete", { id })
 }
 
 export const subscriptionList = (

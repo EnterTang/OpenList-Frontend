@@ -28,7 +28,7 @@ import { createSignal, For, onMount, Show } from "solid-js"
 import { Paginator } from "~/components"
 import { useFetch, useT, useUtil } from "~/hooks"
 import { MobileShareRecord } from "~/types"
-import { handleResp, mobileShareList } from "~/utils"
+import { handleResp, mobileShareDelete, mobileShareList, notify } from "~/utils"
 import { Container } from "../Container"
 
 type ValidFilter = "all" | "true" | "false"
@@ -61,6 +61,7 @@ export const MobileShareManagement = () => {
       per_page: pageSize,
     }),
   )
+  const [deleteLoading, deleteShare] = useFetch(mobileShareDelete)
 
   const refresh = async () => {
     const resp = await listRecords()
@@ -74,6 +75,18 @@ export const MobileShareManagement = () => {
     setPage(1)
     resetPaginator?.()
     refresh()
+  }
+
+  const removeShare = async (record: MobileShareRecord) => {
+    if (
+      !confirm(t("mobile_share.delete_confirm", { name: record.source_name }))
+    )
+      return
+    const resp = await deleteShare(record.id)
+    handleResp(resp, () => {
+      notify.success(t("mobile_share.delete_success"))
+      refresh()
+    })
   }
 
   onMount(refresh)
@@ -275,6 +288,16 @@ export const MobileShareManagement = () => {
                             >
                               {t("mobile_share.open")}
                             </Button>
+                            <Show when={record.is_valid}>
+                              <Button
+                                size="sm"
+                                colorScheme="danger"
+                                loading={deleteLoading()}
+                                onClick={() => removeShare(record)}
+                              >
+                                {t("mobile_share.delete")}
+                              </Button>
+                            </Show>
                           </HStack>
                         </Td>
                       </Tr>

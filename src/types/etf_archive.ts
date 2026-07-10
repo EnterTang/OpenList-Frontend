@@ -48,6 +48,14 @@ export interface ETFArchiveTMDBCandidate {
   genre_ids: number[]
   origin_country: string[]
   original_language: string
+  seasons?: ETFArchiveTMDBSeason[]
+  season_map?: Record<number, number>
+}
+
+export interface ETFArchiveTMDBSeason {
+  season_number: number
+  episode_count: number
+  name: string
 }
 
 export interface ETFManualArchiveMetadata {
