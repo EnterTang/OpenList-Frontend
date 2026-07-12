@@ -183,6 +183,37 @@ export const side_menu_items: SideMenuItem[] = [
     ],
   },
   {
+    title: "cluster.title",
+    icon: BsHddNetwork,
+    to: "/@manage/cluster",
+    children: [
+      {
+        title: "cluster.tabs.overview",
+        icon: BsWindow,
+        to: "/@manage/cluster/overview",
+        component: lazy(() => import("./cluster/Overview")),
+      },
+      {
+        title: "cluster.tabs.nodes",
+        icon: BsHddNetwork,
+        to: "/@manage/cluster/nodes",
+        component: lazy(() => import("./cluster/Nodes")),
+      },
+      {
+        title: "cluster.tabs.jobs",
+        icon: OcWorkflow2,
+        to: "/@manage/cluster/jobs",
+        component: lazy(() => import("./cluster/Jobs")),
+      },
+      {
+        title: "cluster.tabs.settings",
+        icon: BsGearFill,
+        to: "/@manage/cluster/settings",
+        component: lazy(() => import("./cluster/Settings")),
+      },
+    ],
+  },
+  {
     title: "manage.sidemenu.users",
     icon: BsPersonCircle,
     to: "/@manage/users",

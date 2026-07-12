@@ -17,7 +17,7 @@ import {
   VStack,
   useColorModeValue,
 } from "@hope-ui/solid"
-import { AiOutlineReload } from "solid-icons/ai"
+import { AiOutlineDelete, AiOutlineReload } from "solid-icons/ai"
 import {
   createEffect,
   createMemo,
@@ -27,15 +27,24 @@ import {
   onMount,
   Show,
 } from "solid-js"
-import { useFetch, useT, useTitle } from "~/hooks"
+import { useFetch, useListFetch, useT, useTitle } from "~/hooks"
 import { getSetting } from "~/store"
 import {
   Subscription,
+  SubscriptionItem,
   SubscriptionRun,
   SubscriptionSourceType,
   SubscriptionStatus,
 } from "~/types"
-import { handleResp, subscriptionList, subscriptionRuns } from "~/utils"
+import {
+  handleResp,
+  notify,
+  subscriptionGet,
+  subscriptionList,
+  subscriptionRunDelete,
+  subscriptionRuns,
+  subscriptionRunsClearFailed,
+} from "~/utils"
 
 const statusColor: Record<
   SubscriptionStatus,
@@ -74,11 +83,21 @@ const TransferTasks = (props: {
   const [statusFilter, setStatusFilter] = createSignal<StatusFilter>("all")
   const [sourceFilter, setSourceFilter] = createSignal<SourceFilter>("all")
   const [keyword, setKeyword] = createSignal("")
+  const [selectedSubscriptionID, setSelectedSubscriptionID] =
+    createSignal<number>()
+  const [episodeItems, setEpisodeItems] = createSignal<
+    Record<number, SubscriptionItem[]>
+  >({})
   const [subsLoading, loadSubscriptions] = useFetch(() =>
     subscriptionList({ page: 1, per_page: 0 }),
   )
   const [runsLoading, loadRuns] = useFetch(() =>
     subscriptionRuns({ page: 1, per_page: 30 }),
+  )
+  const [itemsLoading, loadSubscription] = useFetch(subscriptionGet)
+  const [deletingRunID, deleteRun] = useListFetch(subscriptionRunDelete)
+  const [clearFailedLoading, clearFailedRuns] = useFetch(
+    subscriptionRunsClearFailed,
   )
   useTitle(
     () =>
@@ -105,6 +124,39 @@ const TransferTasks = (props: {
     })
     return map
   })
+
+  const toggleEpisodeSources = async (id: number) => {
+    if (selectedSubscriptionID() === id) {
+      setSelectedSubscriptionID(undefined)
+      return
+    }
+    setSelectedSubscriptionID(id)
+    if (episodeItems()[id]) return
+    const resp = await loadSubscription(id)
+    handleResp(resp, (data) =>
+      setEpisodeItems((current) => ({
+        ...current,
+        [id]: data.items || [],
+      })),
+    )
+  }
+
+  const episodeLabel = (item: SubscriptionItem) => {
+    if (item.season > 0 && item.episode > 0) {
+      return `S${String(item.season).padStart(2, "0")}E${String(
+        item.episode,
+      ).padStart(2, "0")}`
+    }
+    return item.file_name || item.source_path || `#${item.id}`
+  }
+
+  const episodeProviderLabel = (item: SubscriptionItem) => {
+    const provider = item.source_provider?.trim()
+    if (["quark", "aliyun_drive", "pan123", "pan115"].includes(provider)) {
+      return t(`subscription.telegram_pan_names.${provider}`)
+    }
+    return provider || "-"
+  }
 
   const keywordMatched = (subscription?: Subscription) => {
     const value = keyword().trim().toLowerCase()
@@ -207,6 +259,26 @@ const TransferTasks = (props: {
     const seconds = Math.round((finished - started) / 1000)
     if (seconds < 60) return `${seconds}s`
     return `${Math.floor(seconds / 60)}m ${seconds % 60}s`
+  }
+
+  const removeFailedRun = async (run: SubscriptionRun) => {
+    if (!confirm(t("subscription.board_clear_failure_confirm"))) return
+    const resp = await deleteRun(run.id)
+    handleResp(resp, () => {
+      setRuns((current) => current.filter((item) => item.id !== run.id))
+      notify.success(t("subscription.board_failure_cleared"))
+    })
+  }
+
+  const clearFailureQueue = async () => {
+    if (!confirm(t("subscription.board_clear_failure_queue_confirm"))) return
+    const resp = await clearFailedRuns()
+    handleResp(resp, () => {
+      setRuns((current) =>
+        current.filter((run) => run.status !== "failed" && !run.error),
+      )
+      notify.success(t("subscription.board_failure_queue_cleared"))
+    })
   }
 
   const StatusBadge = (props: { status: SubscriptionStatus }) => (
@@ -450,9 +522,21 @@ const TransferTasks = (props: {
               rounded="$md"
               p="$3"
             >
-              <Text fontWeight="$semibold" color="$danger11">
-                {t("subscription.board_failure_queue")}
-              </Text>
+              <HStack justifyContent="space-between" gap="$2" flexWrap="wrap">
+                <Text fontWeight="$semibold" color="$danger11">
+                  {t("subscription.board_failure_queue")}
+                </Text>
+                <Button
+                  size="sm"
+                  variant="subtle"
+                  colorScheme="danger"
+                  leftIcon={<AiOutlineDelete />}
+                  loading={clearFailedLoading()}
+                  onClick={clearFailureQueue}
+                >
+                  {t("subscription.board_clear_failure_queue")}
+                </Button>
+              </HStack>
               <For each={failedRuns()}>
                 {(run) => (
                   <HStack
@@ -477,6 +561,15 @@ const TransferTasks = (props: {
                     >
                       {run.error || "-"}
                     </Text>
+                    <Button
+                      size="sm"
+                      variant="subtle"
+                      colorScheme="danger"
+                      loading={deletingRunID() === run.id}
+                      onClick={() => removeFailedRun(run)}
+                    >
+                      {t("subscription.board_clear_failure")}
+                    </Button>
                   </HStack>
                 )}
               </For>
@@ -497,6 +590,7 @@ const TransferTasks = (props: {
                   <Th>{t("subscription.target_root")}</Th>
                   <Th>{t("subscription.last_status")}</Th>
                   <Th>{t("subscription.updated_at")}</Th>
+                  <Th>{t("subscription.source_provider")}</Th>
                 </Tr>
               </Thead>
               <Tbody>
@@ -504,7 +598,7 @@ const TransferTasks = (props: {
                   when={filteredSubscriptions().length > 0}
                   fallback={
                     <Tr>
-                      <Td colSpan={5}>
+                      <Td colSpan={6}>
                         <Text color="$neutral11" textAlign="center" py="$4">
                           {t("subscription.board_empty_subscriptions")}
                         </Text>
@@ -547,6 +641,23 @@ const TransferTasks = (props: {
                           </Show>
                         </Td>
                         <Td>{formatDate(record.updated_at)}</Td>
+                        <Td>
+                          <Button
+                            size="sm"
+                            variant="subtle"
+                            loading={
+                              itemsLoading() &&
+                              selectedSubscriptionID() === record.id
+                            }
+                            onClick={() => toggleEpisodeSources(record.id)}
+                          >
+                            {t(
+                              selectedSubscriptionID() === record.id
+                                ? "subscription.board_hide_episode_sources"
+                                : "subscription.board_view_episode_sources",
+                            )}
+                          </Button>
+                        </Td>
                       </Tr>
                     )}
                   </For>
@@ -554,6 +665,81 @@ const TransferTasks = (props: {
               </Tbody>
             </Table>
           </Box>
+
+          <Show when={selectedSubscriptionID()}>
+            {(subscriptionID) => (
+              <VStack
+                alignItems="stretch"
+                spacing="$3"
+                border="1px solid"
+                borderColor={border()}
+                rounded="$md"
+                p="$3"
+              >
+                <HStack justifyContent="space-between" gap="$2" flexWrap="wrap">
+                  <Text fontWeight="$semibold">
+                    {t("subscription.board_episode_sources")} ·{" "}
+                    {subscriptionName(subscriptionID())}
+                  </Text>
+                  <Text color="$neutral11" fontSize="$sm">
+                    {episodeItems()[subscriptionID()]?.length || 0}
+                  </Text>
+                </HStack>
+                <Show
+                  when={(episodeItems()[subscriptionID()] || []).length > 0}
+                  fallback={
+                    <Text color="$neutral11">
+                      {t("subscription.board_empty_episode_sources")}
+                    </Text>
+                  }
+                >
+                  <Box
+                    display="grid"
+                    gap="$2"
+                    gridTemplateColumns={{
+                      "@initial": "1fr",
+                      "@md": "repeat(2, minmax(0, 1fr))",
+                      "@xl": "repeat(3, minmax(0, 1fr))",
+                    }}
+                  >
+                    <For each={episodeItems()[subscriptionID()] || []}>
+                      {(item) => (
+                        <HStack
+                          justifyContent="space-between"
+                          alignItems="start"
+                          gap="$3"
+                          minW="0"
+                          p="$2"
+                          bgColor={mutedBg()}
+                          rounded="$md"
+                        >
+                          <Box minW="0">
+                            <Text fontWeight="$medium">
+                              {episodeLabel(item)}
+                            </Text>
+                            <Text
+                              color="$neutral11"
+                              fontSize="$sm"
+                              css={{
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                              }}
+                            >
+                              {item.file_name || item.source_path || "-"}
+                            </Text>
+                          </Box>
+                          <Badge colorScheme="info">
+                            {episodeProviderLabel(item)}
+                          </Badge>
+                        </HStack>
+                      )}
+                    </For>
+                  </Box>
+                </Show>
+              </VStack>
+            )}
+          </Show>
 
           <Text fontWeight="$semibold">
             {t("subscription.board_runs_table")}

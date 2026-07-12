@@ -19,19 +19,14 @@ import {
   SelectTrigger,
   SelectValue,
   Switch as HopeSwitch,
-  Table,
-  Tbody,
-  Td,
   Text,
   Textarea,
-  Th,
-  Thead,
-  Tr,
   VStack,
   useColorModeValue,
 } from "@hope-ui/solid"
 import {
   AiOutlineDelete,
+  AiOutlineEdit,
   AiOutlineLogin,
   AiOutlineLogout,
   AiOutlinePlayCircle,
@@ -74,6 +69,7 @@ import {
   subscriptionTelegramSendCode,
   subscriptionTelegramSignIn,
   subscriptionTelegramStatus,
+  subscriptionUpdate,
 } from "~/utils"
 import { Container } from "./Container"
 
@@ -215,6 +211,27 @@ const numberValue = (value: string) => {
   return Number.isFinite(parsed) ? parsed : 0
 }
 
+const manualLinksFromSourceConfig = (sourceConfig?: string) => {
+  if (!sourceConfig) return []
+  try {
+    const parsed = JSON.parse(sourceConfig)
+    return Array.isArray(parsed?.links)
+      ? parsed.links.filter((item: unknown) => typeof item === "string")
+      : []
+  } catch {
+    return []
+  }
+}
+
+const sourceConfigWithManualLinks = (sourceConfig: string, links: string[]) => {
+  try {
+    const parsed = sourceConfig ? JSON.parse(sourceConfig) : {}
+    return JSON.stringify({ ...parsed, links })
+  } catch {
+    return JSON.stringify({ links })
+  }
+}
+
 const seasonNumbersFromCandidate = (candidate: ETFArchiveTMDBCandidate) => {
   const seasons = Array.isArray(candidate.seasons) ? candidate.seasons : []
   const fromSeasons = seasons.map((season) => Number(season.season_number))
@@ -269,6 +286,7 @@ export const SubscriptionManagement = () => {
   const [formSourceType, setFormSourceType] =
     createSignal<SubscriptionSourceType>("telegram")
   const [manualLinksText, setManualLinksText] = createSignal("")
+  const [editingID, setEditingID] = createSignal<number>()
   const [form, setForm] = createSignal<Partial<Subscription>>({
     active: true,
     check_interval_minutes: 60,
@@ -276,6 +294,8 @@ export const SubscriptionManagement = () => {
     media_type: "tv",
     season: 1,
     seasons: [],
+    latest_season_episode_start: 0,
+    latest_season_episode_end: 0,
   })
   const [seasonOptions, setSeasonOptions] = createSignal<number[]>([])
   const [tmdbQuery, setTMDBQuery] = createSignal("")
@@ -302,6 +322,7 @@ export const SubscriptionManagement = () => {
     }),
   )
   const [createLoading, createSub] = useFetch(subscriptionCreate)
+  const [updateLoading, updateSub] = useFetch(subscriptionUpdate)
   const [deleteLoading, deleteSub] = useFetch(subscriptionDelete)
   const [checkLoading, checkSub] = useFetch(subscriptionCheck)
   const [tmdbSearchLoading, searchTMDB] = useFetch(etfArchiveTMDBSearch)
@@ -393,6 +414,7 @@ export const SubscriptionManagement = () => {
   }
 
   const resetCreateForm = () => {
+    setEditingID(undefined)
     setFormSourceType("telegram")
     setManualLinksText("")
     setForm({
@@ -402,11 +424,30 @@ export const SubscriptionManagement = () => {
       media_type: "tv",
       season: 1,
       seasons: [],
+      latest_season_episode_start: 0,
+      latest_season_episode_end: 0,
     })
     setSeasonOptions([])
     setTMDBQuery("")
     setTMDBCandidates([])
     setSelectedTMDBCandidate(undefined)
+  }
+
+  const editSubscription = (record: Subscription) => {
+    setEditingID(record.id)
+    setFormSourceType(record.source_type)
+    setManualLinksText(
+      joinLines(manualLinksFromSourceConfig(record.source_config)),
+    )
+    const seasons = record.seasons?.length
+      ? record.seasons
+      : [record.season].filter(Boolean)
+    setForm({ ...record, seasons })
+    setSeasonOptions(seasons)
+    setTMDBQuery(record.tmdb_name || record.name)
+    setTMDBCandidates([])
+    setSelectedTMDBCandidate(undefined)
+    setTab("add")
   }
 
   const updateForm = <K extends keyof Subscription>(
@@ -446,6 +487,8 @@ export const SubscriptionManagement = () => {
         media_type: value,
         season: 0,
         seasons: [],
+        latest_season_episode_start: 0,
+        latest_season_episode_end: 0,
       }))
       return
     }
@@ -475,10 +518,16 @@ export const SubscriptionManagement = () => {
       notify.warning(t("subscription.manual_links_required"))
       return
     }
+    const episodeStart = form().latest_season_episode_start || 0
+    const episodeEnd = form().latest_season_episode_end || 0
+    if (episodeStart > 0 && episodeEnd > 0 && episodeEnd < episodeStart) {
+      notify.warning(t("subscription.episode_range_invalid"))
+      return
+    }
     const sourceConfig =
       formSourceType() === "manual"
-        ? JSON.stringify({ links: manualLinks })
-        : ""
+        ? sourceConfigWithManualLinks(form().source_config || "", manualLinks)
+        : form().source_config || ""
     const payload: Partial<Subscription> = {
       ...form(),
       source_type: formSourceType(),
@@ -487,7 +536,9 @@ export const SubscriptionManagement = () => {
       tmdb_name: form().tmdb_name?.trim(),
       category: form().category?.trim(),
     }
-    const resp = await createSub(payload)
+    const resp = editingID()
+      ? await updateSub({ ...payload, id: editingID() })
+      : await createSub(payload)
     handleResp(resp, () => {
       notify.success(t("global.save_success"))
       resetCreateForm()
@@ -653,9 +704,16 @@ export const SubscriptionManagement = () => {
                     leftIcon={<item.icon />}
                     variant={tab() === item.key ? "solid" : "subtle"}
                     colorScheme={tab() === item.key ? "accent" : "neutral"}
-                    onClick={() => setTab(item.key)}
+                    onClick={() => {
+                      if (item.key === "add" && tab() !== "add") {
+                        resetCreateForm()
+                      }
+                      setTab(item.key)
+                    }}
                   >
-                    {t(`subscription.tabs.${item.key}`)}
+                    {item.key === "add" && editingID()
+                      ? t("subscription.edit_subscription")
+                      : t(`subscription.tabs.${item.key}`)}
                   </Button>
                 )}
               </For>
@@ -683,6 +741,7 @@ export const SubscriptionManagement = () => {
                   refresh={refresh}
                   runCheck={runCheck}
                   removeSubscription={removeSubscription}
+                  editSubscription={editSubscription}
                 />
               </Match>
 
@@ -780,8 +839,22 @@ export const SubscriptionManagement = () => {
                     </Show>
                   </VStack>
 
-                  <Show when={selectedTMDBCandidate()}>
+                  <Show when={selectedTMDBCandidate() || editingID()}>
                     <VStack spacing="$4" alignItems="stretch">
+                      <Show when={editingID()}>
+                        <HStack justifyContent="space-between" flexWrap="wrap">
+                          <Text fontWeight="$semibold" fontSize="$lg">
+                            {t("subscription.edit_subscription")}
+                          </Text>
+                          <Button
+                            size="sm"
+                            variant="subtle"
+                            onClick={resetCreateForm}
+                          >
+                            {t("subscription.cancel_edit")}
+                          </Button>
+                        </HStack>
+                      </Show>
                       <Box
                         display="grid"
                         gap="$3"
@@ -890,6 +963,59 @@ export const SubscriptionManagement = () => {
                             </HStack>
                           </Show>
                         </FormField>
+                        <Show when={form().media_type !== "movie"}>
+                          <FormField
+                            label={t(
+                              "subscription.latest_season_episode_range",
+                            )}
+                            full
+                          >
+                            <VStack alignItems="stretch" spacing="$2">
+                              <Box
+                                display="grid"
+                                gap="$2"
+                                gridTemplateColumns={{
+                                  "@initial": "1fr",
+                                  "@sm": "repeat(2, minmax(0, 1fr))",
+                                }}
+                              >
+                                <Input
+                                  type="number"
+                                  min="0"
+                                  placeholder={t(
+                                    "subscription.episode_range_start",
+                                  )}
+                                  value={
+                                    form().latest_season_episode_start || ""
+                                  }
+                                  onInput={(e) =>
+                                    updateForm(
+                                      "latest_season_episode_start",
+                                      numberValue(e.currentTarget.value),
+                                    )
+                                  }
+                                />
+                                <Input
+                                  type="number"
+                                  min="0"
+                                  placeholder={t(
+                                    "subscription.episode_range_end",
+                                  )}
+                                  value={form().latest_season_episode_end || ""}
+                                  onInput={(e) =>
+                                    updateForm(
+                                      "latest_season_episode_end",
+                                      numberValue(e.currentTarget.value),
+                                    )
+                                  }
+                                />
+                              </Box>
+                              <Text color="$neutral11" fontSize="$sm">
+                                {t("subscription.episode_range_hint")}
+                              </Text>
+                            </VStack>
+                          </FormField>
+                        </Show>
                         <FormField
                           label={t("subscription.check_interval_minutes")}
                         >
@@ -947,10 +1073,14 @@ export const SubscriptionManagement = () => {
                         <Button
                           colorScheme="accent"
                           leftIcon={<AiOutlineSave />}
-                          loading={createLoading()}
+                          loading={createLoading() || updateLoading()}
                           onClick={submitSubscription}
                         >
-                          {t("subscription.create_subscription")}
+                          {t(
+                            editingID()
+                              ? "subscription.save_subscription"
+                              : "subscription.create_subscription",
+                          )}
                         </Button>
                       </HStack>
                     </VStack>
@@ -1242,6 +1372,7 @@ const SubscriptionList = (props: {
   applyFilters: () => void
   refresh: () => void
   runCheck: (id: number, transfer: boolean) => void
+  editSubscription: (record: Subscription) => void
   removeSubscription: (record: Subscription) => void
 }) => {
   const t = useT()
@@ -1330,87 +1461,53 @@ const SubscriptionList = (props: {
         </Button>
       </HStack>
 
-      <Box w="$full" overflowX="auto">
-        <Table highlightOnHover dense>
-          <Thead>
-            <Tr>
-              <For
-                each={[
-                  "name",
-                  "source_type",
-                  "tmdb",
-                  "target_root",
-                  "schedule",
-                  "last_status",
-                  "updated_at",
-                ]}
+      <Box
+        w="$full"
+        display="grid"
+        gap="$3"
+        gridTemplateColumns={{
+          "@initial": "minmax(0, 1fr)",
+          "@xl": "repeat(2, minmax(0, 1fr))",
+        }}
+      >
+        <For each={props.records}>
+          {(record) => {
+            const seasons = () =>
+              (record.seasons?.length ? record.seasons : [record.season])
+                .filter((season) => season > 0)
+                .sort((a, b) => a - b)
+            const episodeRange = () => {
+              if (record.media_type === "movie") return "-"
+              const latestSeason = seasons().at(-1) || record.season
+              const start = record.latest_season_episode_start || 0
+              const end = record.latest_season_episode_end || 0
+              const range = start || end ? `E${start || 1}–E${end || "∞"}` : "∞"
+              return `S${String(latestSeason).padStart(2, "0")} · ${range}`
+            }
+            return (
+              <VStack
+                alignItems="stretch"
+                spacing="$3"
+                minW="0"
+                p="$4"
+                border="1px solid"
+                borderColor="$neutral6"
+                rounded="$lg"
               >
-                {(title) => <Th>{t(`subscription.${title}`)}</Th>}
-              </For>
-              <Th>{t("global.operations")}</Th>
-            </Tr>
-          </Thead>
-          <Tbody>
-            <For each={props.records}>
-              {(record) => (
-                <Tr>
-                  <Td maxW="18rem">
-                    <Text fontWeight="$medium" css={{ wordBreak: "break-all" }}>
-                      {record.name}
-                    </Text>
-                    <Text color="$neutral11" fontSize="$sm">
-                      #{record.id}
-                    </Text>
-                  </Td>
-                  <Td>
-                    <VStack spacing="$1" alignItems="start">
-                      <Badge colorScheme={sourceColor[record.source_type]}>
-                        {t(`subscription.source_types.${record.source_type}`)}
-                      </Badge>
-                      <Badge
-                        colorScheme={record.active ? "success" : "neutral"}
+                <HStack
+                  justifyContent="space-between"
+                  alignItems="start"
+                  gap="$3"
+                >
+                  <Box minW="0">
+                    <HStack gap="$2" flexWrap="wrap">
+                      <Text
+                        fontWeight="$semibold"
+                        fontSize="$lg"
+                        css={{ wordBreak: "break-word" }}
                       >
-                        {t(record.active ? "global.enable" : "global.disable")}
-                      </Badge>
-                    </VStack>
-                  </Td>
-                  <Td maxW="18rem">
-                    <Text css={{ wordBreak: "break-all" }}>
-                      {record.tmdb_name || "-"}
-                    </Text>
-                    <Text color="$neutral11" fontSize="$sm">
-                      {[
-                        record.tmdb_year ? String(record.tmdb_year) : "",
-                        record.tmdb_id ? `tmdb-${record.tmdb_id}` : "",
-                        record.media_type,
-                      ]
-                        .filter(Boolean)
-                        .join(" · ") || "-"}
-                    </Text>
-                  </Td>
-                  <Td maxW="20rem">
-                    <Text css={{ wordBreak: "break-all" }}>
-                      {record.target_root || "-"}
-                    </Text>
-                    <Text color="$neutral11" fontSize="$sm">
-                      {record.category || "-"}
-                    </Text>
-                  </Td>
-                  <Td>
-                    <Text>
-                      {record.check_interval_minutes}
-                      {t("subscription.minutes")}
-                    </Text>
-                    <Text color="$neutral11" fontSize="$sm">
-                      {t(
-                        record.transfer_enabled
-                          ? "subscription.transfer_on"
-                          : "subscription.transfer_off",
-                      )}
-                    </Text>
-                  </Td>
-                  <Td maxW="16rem">
-                    <VStack spacing="$1" alignItems="start">
+                        {record.name}
+                      </Text>
                       <Badge
                         colorScheme={
                           statusColor[record.last_status] || "neutral"
@@ -1420,52 +1517,118 @@ const SubscriptionList = (props: {
                           `subscription.statuses.${record.last_status || "idle"}`,
                         )}
                       </Badge>
-                      <Show when={record.last_error}>
-                        <Text
-                          color="$danger11"
-                          fontSize="$sm"
-                          css={{ wordBreak: "break-all" }}
-                        >
-                          {record.last_error}
-                        </Text>
-                      </Show>
-                    </VStack>
-                  </Td>
-                  <Td>{record.updated_at}</Td>
-                  <Td>
-                    <HStack spacing="$2">
-                      <Button
-                        size="sm"
-                        leftIcon={<AiOutlinePlayCircle />}
-                        loading={props.checkLoading}
-                        onClick={() => props.runCheck(record.id, false)}
-                      >
-                        {t("subscription.check")}
-                      </Button>
-                      <Button
-                        size="sm"
-                        leftIcon={<AiOutlinePlayCircle />}
-                        loading={props.checkLoading}
-                        onClick={() => props.runCheck(record.id, true)}
-                      >
-                        {t("subscription.check_transfer")}
-                      </Button>
-                      <Button
-                        size="sm"
-                        colorScheme="danger"
-                        leftIcon={<AiOutlineDelete />}
-                        loading={props.deleteLoading}
-                        onClick={() => props.removeSubscription(record)}
-                      >
-                        {t("global.delete")}
-                      </Button>
                     </HStack>
-                  </Td>
-                </Tr>
-              )}
-            </For>
-          </Tbody>
-        </Table>
+                    <Text color="$neutral11" fontSize="$sm">
+                      #{record.id} · {record.tmdb_name || "-"}
+                      {record.tmdb_year ? ` (${record.tmdb_year})` : ""}
+                    </Text>
+                  </Box>
+                  <VStack spacing="$1" alignItems="end">
+                    <Badge colorScheme={sourceColor[record.source_type]}>
+                      {t(`subscription.source_types.${record.source_type}`)}
+                    </Badge>
+                    <Badge colorScheme={record.active ? "success" : "neutral"}>
+                      {t(record.active ? "global.enable" : "global.disable")}
+                    </Badge>
+                  </VStack>
+                </HStack>
+
+                <Box
+                  display="grid"
+                  gap="$3"
+                  gridTemplateColumns={{
+                    "@initial": "1fr",
+                    "@sm": "repeat(2, minmax(0, 1fr))",
+                  }}
+                >
+                  <Box minW="0">
+                    <Text color="$neutral11" fontSize="$sm">
+                      {t("subscription.target_root")}
+                    </Text>
+                    <Text css={{ wordBreak: "break-all" }}>
+                      {record.target_root || "-"}
+                    </Text>
+                    <Text color="$neutral11" fontSize="$sm">
+                      {record.category || "-"}
+                    </Text>
+                  </Box>
+                  <Box>
+                    <Text color="$neutral11" fontSize="$sm">
+                      {t("subscription.latest_season_episode_range")}
+                    </Text>
+                    <Text>{episodeRange()}</Text>
+                    <Text color="$neutral11" fontSize="$sm">
+                      {record.check_interval_minutes}
+                      {t("subscription.minutes")} ·{" "}
+                      {t(
+                        record.transfer_enabled
+                          ? "subscription.transfer_on"
+                          : "subscription.transfer_off",
+                      )}
+                    </Text>
+                  </Box>
+                </Box>
+
+                <Show when={record.last_error}>
+                  <Text
+                    color="$danger11"
+                    fontSize="$sm"
+                    css={{ wordBreak: "break-word" }}
+                  >
+                    {record.last_error}
+                  </Text>
+                </Show>
+
+                <HStack
+                  justifyContent="space-between"
+                  alignItems="end"
+                  gap="$2"
+                  flexWrap="wrap"
+                >
+                  <Text color="$neutral11" fontSize="$sm">
+                    {record.updated_at}
+                  </Text>
+                  <HStack spacing="$2" gap="$2" flexWrap="wrap">
+                    <Button
+                      size="sm"
+                      leftIcon={<AiOutlinePlayCircle />}
+                      loading={props.checkLoading}
+                      onClick={() => props.runCheck(record.id, false)}
+                    >
+                      {t("subscription.check")}
+                    </Button>
+                    <Button
+                      size="sm"
+                      leftIcon={<AiOutlinePlayCircle />}
+                      loading={props.checkLoading}
+                      onClick={() => props.runCheck(record.id, true)}
+                    >
+                      {t("subscription.check_transfer")}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="subtle"
+                      leftIcon={<AiOutlineEdit />}
+                      onClick={() => props.editSubscription(record)}
+                    >
+                      {t("global.edit")}
+                    </Button>
+                    <Button
+                      size="sm"
+                      colorScheme="danger"
+                      variant="subtle"
+                      leftIcon={<AiOutlineDelete />}
+                      loading={props.deleteLoading}
+                      onClick={() => props.removeSubscription(record)}
+                    >
+                      {t("global.delete")}
+                    </Button>
+                  </HStack>
+                </HStack>
+              </VStack>
+            )
+          }}
+        </For>
       </Box>
       <Paginator
         total={props.total}

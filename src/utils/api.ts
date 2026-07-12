@@ -21,11 +21,31 @@ import {
   MobileShareRecord,
   Subscription,
   SubscriptionConfig,
+  SubscriptionDetail,
   SubscriptionTelegramAuthResp,
   SubscriptionRun,
   SubscriptionRunResult,
   SubscriptionResourceSearchResp,
   SubscriptionSourceType,
+  ClusterControlAudit,
+  ClusterDispatchMediaBatchInput,
+  ClusterDispatchMediaBatchResult,
+  ClusterDispatchMediaJobInput,
+  ClusterJob,
+  ClusterJobStatus,
+  ClusterNode,
+  ClusterNodeDesiredConfig,
+  ClusterNodeMutableState,
+  ClusterResultQueueStats,
+  ClusterRuntimeConfig,
+  ClusterRuntimeConfigWriteInput,
+  ClusterSecret,
+  ClusterSecretWriteInput,
+  ClusterStorageProfile,
+  ClusterStorageProfileWriteInput,
+  ClusterUploadETFManifestInput,
+  ClusterUploadManifest,
+  ClusterWorkerDesiredConfig,
 } from "~/types"
 import { r } from "."
 
@@ -394,6 +414,16 @@ export const subscriptionCreate = (
   return r.post("/admin/subscription/create", subscription)
 }
 
+export const subscriptionUpdate = (
+  subscription: Partial<Subscription>,
+): PResp<Subscription> => {
+  return r.post("/admin/subscription/update", subscription)
+}
+
+export const subscriptionGet = (id: number): PResp<SubscriptionDetail> => {
+  return r.get("/admin/subscription/get", { params: { id } })
+}
+
 export const subscriptionDelete = (id: number): PEmptyResp => {
   return r.post("/admin/subscription/delete", { id })
 }
@@ -414,6 +444,14 @@ export const subscriptionRuns = (
   } = {},
 ): PPageResp<SubscriptionRun> => {
   return r.get("/admin/subscription/runs", { params })
+}
+
+export const subscriptionRunDelete = (id: number): PEmptyResp => {
+  return r.post("/admin/subscription/runs/delete", { id })
+}
+
+export const subscriptionRunsClearFailed = (): PResp<{ deleted: number }> => {
+  return r.post("/admin/subscription/runs/clear_failed")
 }
 
 export const subscriptionResourceSearch = (
@@ -465,3 +503,123 @@ export const subscriptionTelegramLogout =
   (): PResp<SubscriptionTelegramAuthResp> => {
     return r.post("/admin/subscription/telegram/logout", {})
   }
+
+export const clusterListNodes = (): PResp<ClusterNode[]> => {
+  return r.get("/admin/cluster/nodes")
+}
+
+export const clusterGetConfig = (): PResp<ClusterRuntimeConfig> => {
+  return r.get("/admin/cluster/config")
+}
+
+export const clusterSaveConfig = (
+  input: ClusterRuntimeConfigWriteInput,
+): PResp<ClusterRuntimeConfig> => {
+  return r.post("/admin/cluster/config", input)
+}
+
+export const clusterQueryNodeInventory = (
+  nodeId: string,
+): PResp<{ requested: boolean }> => {
+  return r.post(
+    `/admin/cluster/nodes/${encodeURIComponent(nodeId)}/inventory/query`,
+  )
+}
+
+export const clusterSetNodeState = (
+  nodeId: string,
+  state: ClusterNodeMutableState,
+): PResp<{ updated: boolean }> => {
+  return r.post(`/admin/cluster/nodes/${encodeURIComponent(nodeId)}/state`, {
+    state,
+  })
+}
+
+export const clusterApplyNodeConfig = (
+  nodeId: string,
+  config: ClusterWorkerDesiredConfig,
+): PResp<ClusterNodeDesiredConfig> => {
+  return r.post(
+    `/admin/cluster/nodes/${encodeURIComponent(nodeId)}/config`,
+    config,
+  )
+}
+
+export const clusterListResults = (
+  limit = 100,
+): PResp<ClusterUploadManifest[]> => {
+  return r.get("/admin/cluster/results", { params: { limit } })
+}
+
+export const clusterListJobs = (
+  params: {
+    status?: ClusterJobStatus
+    include_archived?: boolean
+    limit?: number
+  } = {},
+): PResp<ClusterJob[]> => {
+  return r.get("/admin/cluster/jobs", { params })
+}
+
+export const clusterDispatchMediaJob = (
+  input: ClusterDispatchMediaJobInput,
+): PResp<ClusterJob> => {
+  return r.post("/admin/cluster/jobs/dispatch", input)
+}
+
+export const clusterDispatchMediaBatch = (
+  input: ClusterDispatchMediaBatchInput,
+): PResp<ClusterDispatchMediaBatchResult> => {
+  return r.post("/admin/cluster/jobs/dispatch_batch", input)
+}
+
+export const clusterRetryJob = (jobId: string): PResp<{ queued: boolean }> => {
+  return r.post(`/admin/cluster/jobs/${encodeURIComponent(jobId)}/retry`)
+}
+
+export const clusterClearFailedJobs = (): PResp<{ archived: number }> => {
+  return r.post("/admin/cluster/jobs/clear_failed")
+}
+
+export const clusterGetResultQueueStats =
+  (): PResp<ClusterResultQueueStats> => {
+    return r.get("/admin/cluster/result_queue/stats")
+  }
+
+export const clusterEnqueueUploadResult = (
+  input: ClusterUploadETFManifestInput,
+): PResp<{ stream_id: string; media_delete_allowed: boolean }> => {
+  return r.post("/admin/cluster/result_queue/enqueue", input)
+}
+
+export const clusterListSecrets = (): PResp<ClusterSecret[]> => {
+  return r.get("/admin/cluster/secrets")
+}
+
+export const clusterWriteSecret = (
+  input: ClusterSecretWriteInput,
+): PResp<ClusterSecret> => {
+  return r.post("/admin/cluster/secrets", input)
+}
+
+export const clusterRevokeSecret = (
+  secretId: string,
+): PResp<{ revoked: boolean }> => {
+  return r.post(`/admin/cluster/secrets/${encodeURIComponent(secretId)}/revoke`)
+}
+
+export const clusterListStorageProfiles = (): PResp<
+  ClusterStorageProfile[]
+> => {
+  return r.get("/admin/cluster/storage-profiles")
+}
+
+export const clusterApplyStorageProfile = (
+  input: ClusterStorageProfileWriteInput,
+): PResp<ClusterStorageProfile> => {
+  return r.post("/admin/cluster/storage-profiles", input)
+}
+
+export const clusterListAudit = (limit = 100): PResp<ClusterControlAudit[]> => {
+  return r.get("/admin/cluster/audit", { params: { limit } })
+}

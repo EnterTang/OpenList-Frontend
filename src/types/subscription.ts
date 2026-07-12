@@ -20,6 +20,8 @@ export interface Subscription {
   category: string
   season: number
   seasons?: number[]
+  latest_season_episode_start: number
+  latest_season_episode_end: number
   last_checked_at?: string
   last_cursor: string
   last_tree_hash: string
@@ -33,6 +35,7 @@ export interface SubscriptionItem {
   updated_at: string
   subscription_id: number
   source_key: string
+  source_provider: string
   source_url: string
   source_path: string
   file_name: string
@@ -45,6 +48,11 @@ export interface SubscriptionItem {
   status: string
   last_seen_at: string
   last_error: string
+}
+
+export interface SubscriptionDetail {
+  subscription: Subscription
+  items: SubscriptionItem[]
 }
 
 export interface SubscriptionRun {

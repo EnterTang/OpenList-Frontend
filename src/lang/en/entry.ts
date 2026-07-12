@@ -1,4 +1,5 @@
 import br from "./br.json"
+import cluster from "./cluster.json"
 import drivers from "./drivers.json"
 import etf_archive from "./etf_archive.json"
 import global from "./global.json"
@@ -19,6 +20,7 @@ import users from "./users.json"
 
 export const dict = {
   br,
+  cluster,
   drivers,
   etf_archive,
   global,
