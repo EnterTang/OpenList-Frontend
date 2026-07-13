@@ -42,6 +42,18 @@ import { formatDate, shortID } from "./helpers"
 
 const pollInterval = 10000
 
+const formatBytes = (value?: number) => {
+  if (!value || value <= 0) return "-"
+  const units = ["B", "KB", "MB", "GB", "TB"]
+  let size = value
+  let index = 0
+  while (size >= 1024 && index < units.length - 1) {
+    size /= 1024
+    index += 1
+  }
+  return `${size >= 100 || index === 0 ? size.toFixed(0) : size.toFixed(1)} ${units[index]}`
+}
+
 const Nodes = () => {
   const t = useT()
   useManageTitle("cluster.nodes.title")
@@ -95,6 +107,68 @@ const Nodes = () => {
         (node) => node.status === "online" && !node.drain && !node.disabled,
       ).length,
   )
+
+  const NodeInventorySummary = (props: { node: ClusterNode }) => {
+    const inventory = () => props.node.latest_inventory
+    const accounts = () => inventory()?.provider_accounts || []
+    const capabilities = () => inventory()?.capabilities
+    return (
+      <VStack alignItems="stretch" spacing="$1" minW="0">
+        <Text size="xs" color="$neutral11">
+          {capabilities()
+            ? `${t("cluster.control.download_concurrency")}: ${
+                capabilities()?.download_concurrency || 0
+              } · ${t("cluster.control.upload_concurrency")}: ${
+                capabilities()?.upload_concurrency || 0
+              }`
+            : "-"}
+        </Text>
+        <Show
+          when={accounts().length > 0}
+          fallback={
+            <Text size="xs" color="$neutral11">
+              {inventory()?.inventory_hash || "-"}
+            </Text>
+          }
+        >
+          <For each={accounts()}>
+            {(account) => (
+              <Box
+                px="$2"
+                py="$1"
+                rounded="$sm"
+                bgColor="$neutral3"
+                css={{ wordBreak: "break-word" }}
+              >
+                <Text size="xs" fontWeight="$medium">
+                  {[
+                    account.provider,
+                    account.account_alias || account.mount_path,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </Text>
+                <Text size="xs" color="$neutral11">
+                  {[
+                    account.membership_tier || account.status,
+                    account.supports_upload ? "upload" : "",
+                    account.supports_share_save ? "save" : "",
+                    account.supports_etf ? "ETF" : "",
+                    account.max_single_upload_bytes
+                      ? formatBytes(account.max_single_upload_bytes)
+                      : "",
+                    account.free_bytes ? formatBytes(account.free_bytes) : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </Text>
+              </Box>
+            )}
+          </For>
+        </Show>
+      </VStack>
+    )
+  }
 
   const NodeActions = (props: { node: ClusterNode }) => (
     <HStack
@@ -221,6 +295,7 @@ const Nodes = () => {
                     <Th>{t("cluster.fields.version")}</Th>
                     <Th>{t("cluster.fields.weight")}</Th>
                     <Th>{t("cluster.fields.last_heartbeat")}</Th>
+                    <Th>{t("cluster.nodes.inventory")}</Th>
                     <Th textAlign="right">{t("cluster.fields.actions")}</Th>
                   </Tr>
                 </Thead>
@@ -264,6 +339,9 @@ const Nodes = () => {
                         <Td>{node.weight}</Td>
                         <Td css={{ whiteSpace: "nowrap" }}>
                           {formatDate(node.last_heartbeat_at)}
+                        </Td>
+                        <Td minW="20rem">
+                          <NodeInventorySummary node={node} />
                         </Td>
                         <Td>
                           <NodeActions node={node} />
@@ -319,6 +397,12 @@ const Nodes = () => {
                         </Text>
                       </Box>
                     </SimpleGrid>
+                    <Box mb="$3">
+                      <Text size="xs" color="$neutral11" mb="$1">
+                        {t("cluster.nodes.inventory")}
+                      </Text>
+                      <NodeInventorySummary node={node} />
+                    </Box>
                     <Show when={node.last_error}>
                       <Text mb="$3" size="sm" color="$danger11">
                         {node.last_error}

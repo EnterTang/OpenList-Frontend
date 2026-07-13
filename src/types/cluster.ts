@@ -132,6 +132,7 @@ export interface ClusterNode {
   key_algorithm?: string
   key_id?: string
   last_error: string
+  latest_inventory?: ClusterNodeInventorySummary
 }
 
 export interface ClusterResultQueueStats {
@@ -180,6 +181,33 @@ export interface ClusterMountInventory {
   free_bytes?: number
   driver_version?: string
   config_schema_hash?: string
+}
+
+export interface ClusterProviderAccountInventory {
+  node_mount_id: string
+  provider: string
+  mount_path: string
+  account_alias?: string
+  account_fingerprint?: string
+  status: string
+  membership_tier?: string
+  membership_weight?: number
+  max_single_upload_bytes?: number
+  supports_upload: boolean
+  supports_download: boolean
+  supports_share_save: boolean
+  supports_etf: boolean
+  total_bytes?: number
+  free_bytes?: number
+  active_jobs?: number
+}
+
+export interface ClusterNodeInventorySummary {
+  collected_at?: string | null
+  inventory_hash?: string
+  capabilities?: ClusterNodeCapabilities
+  mounts?: ClusterMountInventory[]
+  provider_accounts?: ClusterProviderAccountInventory[]
 }
 
 export interface ClusterSourceObject {

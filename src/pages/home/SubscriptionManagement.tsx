@@ -53,6 +53,7 @@ import {
   ETFArchiveTMDBCandidate,
   SubscriptionMediaType,
   SubscriptionSourceType,
+  SubscriptionStorageTarget,
   SubscriptionTelegramAuthResp,
 } from "~/types"
 import {
@@ -87,6 +88,8 @@ const tabItems: { key: SubscriptionTab; icon: typeof AiOutlineReload }[] = [
 
 const sourceTypes: SubscriptionSourceType[] = ["manual", "telegram", "pansou"]
 const mediaTypes: SubscriptionMediaType[] = ["tv", "movie"]
+const deliveryProviders = ["yidong139"] as const
+const tempTransferProviders = ["pan123", "pan115"] as const
 type TelegramPanKey = "quark" | "aliyun_drive" | "pan123" | "pan115"
 type TelegramPanConfig = SubscriptionConfig["telegram"]["quark"]
 
@@ -113,9 +116,15 @@ const statusColor: Record<string, "neutral" | "info" | "success" | "danger"> = {
   failed: "danger",
 }
 
+const emptyStorageTarget = (provider = ""): SubscriptionStorageTarget => ({
+  provider,
+  folder: "",
+})
+
 const emptyTelegramPanConfig = (): TelegramPanConfig => ({
   channels: [],
   temp_transfer_root: "",
+  temp_transfer_target: emptyStorageTarget(),
   delete_source_after: false,
   cookie: "",
   refresh_token: "",
@@ -155,6 +164,10 @@ const fillTelegramPanConfig = (
   const next = {
     ...emptyTelegramPanConfig(),
     ...(config || {}),
+    temp_transfer_target: {
+      ...emptyStorageTarget(),
+      ...(config?.temp_transfer_target || {}),
+    },
   }
   if (!Array.isArray(next.channels)) {
     next.channels = []
@@ -194,6 +207,7 @@ const fillTelegramConfig = (
 
 const defaultConfig = (): SubscriptionConfig => ({
   default_target_root: "",
+  default_target: emptyStorageTarget(),
   telegram: emptyTelegramConfig(),
   pansou: { ...emptyPanSouConfig },
 })
@@ -255,6 +269,62 @@ const telegramUserLabel = (status?: SubscriptionTelegramAuthResp) => {
   }
   return user.id ? `#${user.id}` : ""
 }
+
+const providerOptionLabel = (provider: string, t: (key: string) => string) => {
+  if (["quark", "aliyun_drive", "pan123", "pan115"].includes(provider)) {
+    return t(`subscription.telegram_pan_names.${provider}`)
+  }
+  if (provider === "yidong139") {
+    return "139"
+  }
+  return provider
+}
+
+const normalizeStorageTargetForSave = (
+  target?: SubscriptionStorageTarget,
+): SubscriptionStorageTarget | undefined => {
+  const provider = target?.provider?.trim() || ""
+  const folder = target?.folder?.trim() || ""
+  if (!provider && !folder) return undefined
+  return { provider, folder }
+}
+
+const buildConfigPayload = (value: SubscriptionConfig): SubscriptionConfig => ({
+  ...value,
+  default_target_root: undefined,
+  default_target: normalizeStorageTargetForSave(value.default_target),
+  telegram: {
+    ...value.telegram,
+    quark: {
+      ...value.telegram.quark,
+      temp_transfer_root: "",
+      temp_transfer_target: normalizeStorageTargetForSave(
+        value.telegram.quark.temp_transfer_target,
+      ),
+    },
+    aliyun_drive: {
+      ...value.telegram.aliyun_drive,
+      temp_transfer_root: "",
+      temp_transfer_target: normalizeStorageTargetForSave(
+        value.telegram.aliyun_drive.temp_transfer_target,
+      ),
+    },
+    pan123: {
+      ...value.telegram.pan123,
+      temp_transfer_root: "",
+      temp_transfer_target: normalizeStorageTargetForSave(
+        value.telegram.pan123.temp_transfer_target,
+      ),
+    },
+    pan115: {
+      ...value.telegram.pan115,
+      temp_transfer_root: "",
+      temp_transfer_target: normalizeStorageTargetForSave(
+        value.telegram.pan115.temp_transfer_target,
+      ),
+    },
+  },
+})
 
 const FormField = (props: {
   label: string
@@ -602,7 +672,7 @@ export const SubscriptionManagement = () => {
   }
 
   const submitConfig = async () => {
-    const resp = await saveConfig(config())
+    const resp = await saveConfig(buildConfigPayload(config()))
     handleResp(resp, (data) => {
       setConfig(fillConfig(data))
       notify.success(t("global.save_success"))
@@ -610,7 +680,7 @@ export const SubscriptionManagement = () => {
   }
 
   const saveCurrentConfig = async () => {
-    const resp = await saveConfig(config())
+    const resp = await saveConfig(buildConfigPayload(config()))
     if (resp.code !== 200) {
       handleResp(resp)
       return false
@@ -1099,17 +1169,14 @@ export const SubscriptionManagement = () => {
                         "@md": "repeat(2, minmax(0, 1fr))",
                       }}
                     >
-                      <FormField label={t("subscription.default_target_root")}>
-                        <Input
-                          value={config().default_target_root || ""}
-                          onInput={(e) =>
-                            updateConfig(
-                              "default_target_root",
-                              e.currentTarget.value,
-                            )
-                          }
-                        />
-                      </FormField>
+                      <StorageTargetFields
+                        label={t("subscription.default_target_root")}
+                        value={config().default_target}
+                        providerOptions={[...deliveryProviders]}
+                        onChange={(value) =>
+                          updateConfig("default_target", value)
+                        }
+                      />
                     </Box>
                   </ConfigSection>
 
@@ -1543,13 +1610,15 @@ const SubscriptionList = (props: {
                 >
                   <Box minW="0">
                     <Text color="$neutral11" fontSize="$sm">
-                      {t("subscription.target_root")}
+                      {t("subscription.category")}
                     </Text>
-                    <Text css={{ wordBreak: "break-all" }}>
-                      {record.target_root || "-"}
+                    <Text css={{ wordBreak: "break-word" }}>
+                      {record.category || "-"}
                     </Text>
                     <Text color="$neutral11" fontSize="$sm">
-                      {record.category || "-"}
+                      {t(
+                        `subscription.media_types.${record.media_type || "tv"}`,
+                      )}
                     </Text>
                   </Box>
                   <Box>
@@ -1777,6 +1846,66 @@ const MediaTypeSelect = (props: {
   )
 }
 
+const StorageTargetFields = (props: {
+  label: string
+  value?: SubscriptionStorageTarget
+  providerOptions: string[]
+  onChange: (value: SubscriptionStorageTarget) => void
+}) => {
+  const t = useT()
+  const current = () => props.value || emptyStorageTarget()
+  return (
+    <Box
+      display="grid"
+      gap="$3"
+      gridTemplateColumns={{
+        "@initial": "1fr",
+        "@md": "minmax(0, 12rem) minmax(0, 1fr)",
+      }}
+      gridColumn="1 / -1"
+    >
+      <FormField label={`${props.label} · ${t("cluster.control.provider")}`}>
+        <Select
+          value={current().provider || undefined}
+          onChange={(value) =>
+            props.onChange({ ...current(), provider: String(value || "") })
+          }
+        >
+          <SelectTrigger>
+            <SelectPlaceholder>
+              {t("cluster.control.provider")}
+            </SelectPlaceholder>
+            <SelectValue />
+            <SelectIcon />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectListbox>
+              <For each={props.providerOptions}>
+                {(provider) => (
+                  <SelectOption value={provider}>
+                    <SelectOptionText>
+                      {providerOptionLabel(provider, t)}
+                    </SelectOptionText>
+                    <SelectOptionIndicator />
+                  </SelectOption>
+                )}
+              </For>
+            </SelectListbox>
+          </SelectContent>
+        </Select>
+      </FormField>
+      <FormField label={`${props.label} · ${t("mobile_share.folder")}`}>
+        <Input
+          value={current().folder || ""}
+          onInput={(e) =>
+            props.onChange({ ...current(), folder: e.currentTarget.value })
+          }
+        />
+      </FormField>
+    </Box>
+  )
+}
+
 const ConfigSection = (props: { title: string; children: JSXElement }) => {
   const border = useColorModeValue("$neutral5", "$neutral7")
   return (
@@ -1863,14 +1992,12 @@ const TelegramPanConfigFields = (props: {
           }}
           alignItems="end"
         >
-          <FormField label={t("subscription.temp_transfer_root")}>
-            <Input
-              value={props.value.temp_transfer_root}
-              onInput={(e) =>
-                props.onChange("temp_transfer_root", e.currentTarget.value)
-              }
-            />
-          </FormField>
+          <StorageTargetFields
+            label={t("subscription.temp_transfer_root")}
+            value={props.value.temp_transfer_target}
+            providerOptions={[...tempTransferProviders]}
+            onChange={(value) => props.onChange("temp_transfer_target", value)}
+          />
           <FormControl display="flex" flexDirection="column">
             <FormLabel>{t("subscription.source_cleanup")}</FormLabel>
             <HopeSwitch
@@ -1899,6 +2026,10 @@ const fillConfig = (config: SubscriptionConfig): SubscriptionConfig => {
   return {
     ...defaultConfig(),
     ...rest,
+    default_target: {
+      ...emptyStorageTarget(),
+      ...(config.default_target || {}),
+    },
     telegram: fillTelegramConfig(config.telegram),
     pansou: {
       ...emptyPanSouConfig,

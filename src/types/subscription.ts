@@ -2,6 +2,11 @@ export type SubscriptionSourceType = "manual" | "telegram" | "pansou"
 export type SubscriptionStatus = "idle" | "running" | "success" | "failed"
 export type SubscriptionMediaType = "tv" | "movie"
 
+export interface SubscriptionStorageTarget {
+  provider?: string
+  folder?: string
+}
+
 export interface Subscription {
   id: number
   created_at: string
@@ -119,11 +124,13 @@ export interface SubscriptionTelegramSourceConfig {
 export interface SubscriptionTelegramPanConfig {
   channels: string[]
   temp_transfer_root: string
+  temp_transfer_target?: SubscriptionStorageTarget
   delete_source_after: boolean
   cookie?: string
   refresh_token?: string
   access_token?: string
   drive_id?: string
+  drive_type?: string
 }
 
 export interface SubscriptionTelegramAuthResp {
@@ -153,6 +160,7 @@ export interface SubscriptionPanSouSourceConfig {
 
 export interface SubscriptionConfig {
   default_target_root?: string
+  default_target?: SubscriptionStorageTarget
   default_check_interval_minutes?: number
   default_transfer_enabled?: boolean
   default_media_type?: SubscriptionMediaType

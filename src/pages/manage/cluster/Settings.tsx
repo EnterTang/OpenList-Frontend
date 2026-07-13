@@ -408,22 +408,6 @@ const Settings = () => {
                 />
               </FormControl>
               <FormControl>
-                <FormLabel for="cluster-etf-root">
-                  {t("cluster.settings.etf_root_path")}
-                </FormLabel>
-                <Input
-                  id="cluster-etf-root"
-                  value={config().etf_root_path}
-                  placeholder="/移动云盘/ETF"
-                  onInput={(event) =>
-                    update("etf_root_path", event.currentTarget.value)
-                  }
-                />
-                <FormHelperText>
-                  {t("cluster.settings.etf_root_path_help")}
-                </FormHelperText>
-              </FormControl>
-              <FormControl>
                 <FormLabel for="cluster-target-url">
                   {t("cluster.settings.target_base_url")}
                 </FormLabel>

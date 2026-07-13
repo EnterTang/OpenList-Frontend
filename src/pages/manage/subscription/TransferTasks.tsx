@@ -164,7 +164,6 @@ const TransferTasks = (props: {
     return [
       subscription?.name,
       subscription?.tmdb_name,
-      subscription?.target_root,
       subscription?.category,
       subscription?.source_type,
     ]
@@ -587,7 +586,7 @@ const TransferTasks = (props: {
                 <Tr>
                   <Th>{t("subscription.name")}</Th>
                   <Th>{t("subscription.source_type")}</Th>
-                  <Th>{t("subscription.target_root")}</Th>
+                  <Th>{t("subscription.category")}</Th>
                   <Th>{t("subscription.last_status")}</Th>
                   <Th>{t("subscription.updated_at")}</Th>
                   <Th>{t("subscription.source_provider")}</Th>
@@ -624,8 +623,8 @@ const TransferTasks = (props: {
                           {t(`subscription.source_types.${record.source_type}`)}
                         </Td>
                         <Td maxW="20rem">
-                          <Text css={{ wordBreak: "break-all" }}>
-                            {record.target_root || "-"}
+                          <Text css={{ wordBreak: "break-word" }}>
+                            {record.category || "-"}
                           </Text>
                         </Td>
                         <Td>
