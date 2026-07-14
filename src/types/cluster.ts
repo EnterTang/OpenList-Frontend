@@ -184,6 +184,7 @@ export interface ClusterMountInventory {
 }
 
 export interface ClusterProviderAccountInventory {
+  storage_id: number
   node_mount_id: string
   provider: string
   mount_path: string

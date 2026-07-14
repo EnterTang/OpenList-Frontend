@@ -57,6 +57,18 @@
     "session": "工作階段",
     "key": "節點金鑰",
     "inventory": "網盤掛載",
+    "account_alias": "帳號",
+    "storage_id": "儲存 ID",
+    "membership_tier": "會員等級",
+    "free_total_bytes": "可用 / 總容量",
+    "active_jobs": "執行中任務",
+    "single_upload_limit": "單檔上傳上限",
+    "capabilities": {
+      "share_save": "轉存",
+      "download": "下載",
+      "upload": "上傳",
+      "etf": "ETF"
+    },
     "last_error": "最近錯誤",
     "state_updated": "Worker 狀態已更新",
     "inventory_requested": "已傳送掛載查詢要求",

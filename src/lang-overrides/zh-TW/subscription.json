@@ -1,5 +1,11 @@
 {
   "default_target_root": "默認目標根目錄",
+  "temp_target": "臨時轉存目標",
+  "delivery_target": "最終上傳目標",
+  "storage_target_required": "請選擇網盤類型並填寫盤內目錄",
+  "storage_target_folder_placeholder": "盤內目錄，例如：劇集/港台劇",
+  "storage_target_folder_hint": "填寫網盤內目錄，不是 OpenList 掛載路徑。",
+  "storage_target_folder_relative": "請填寫相對盤內目錄，不要使用 /123、/139、磁碟代號或 ..",
   "latest_season_episode_range": "最新季集數範圍",
   "episode_range_start": "起始集",
   "episode_range_end": "結束集",

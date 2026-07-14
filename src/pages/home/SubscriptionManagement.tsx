@@ -53,6 +53,7 @@ import {
   ETFArchiveTMDBCandidate,
   SubscriptionMediaType,
   SubscriptionSourceType,
+  SubscriptionStorageProvider,
   SubscriptionStorageTarget,
   SubscriptionTelegramAuthResp,
 } from "~/types"
@@ -116,8 +117,10 @@ const statusColor: Record<string, "neutral" | "info" | "success" | "danger"> = {
   failed: "danger",
 }
 
-const emptyStorageTarget = (provider = ""): SubscriptionStorageTarget => ({
-  provider,
+const emptyStorageTarget = (
+  provider: SubscriptionStorageProvider | "" = "",
+): SubscriptionStorageTarget => ({
+  provider: provider || undefined,
   folder: "",
 })
 
@@ -283,10 +286,31 @@ const providerOptionLabel = (provider: string, t: (key: string) => string) => {
 const normalizeStorageTargetForSave = (
   target?: SubscriptionStorageTarget,
 ): SubscriptionStorageTarget | undefined => {
-  const provider = target?.provider?.trim() || ""
+  const provider = target?.provider
   const folder = target?.folder?.trim() || ""
   if (!provider && !folder) return undefined
   return { provider, folder }
+}
+
+const storageTargetValidationKey = (
+  target?: SubscriptionStorageTarget,
+  required = false,
+) => {
+  const provider = target?.provider
+  const folder = target?.folder?.trim() || ""
+  if (!provider && !folder) {
+    return required ? "subscription.storage_target_required" : undefined
+  }
+  if (!provider || !folder) return "subscription.storage_target_required"
+  if (
+    folder.startsWith("/") ||
+    folder.startsWith("\\") ||
+    /^[a-z]:[\\/]/i.test(folder) ||
+    folder.split(/[\\/]/).includes("..")
+  ) {
+    return "subscription.storage_target_folder_relative"
+  }
+  return undefined
 }
 
 const buildConfigPayload = (value: SubscriptionConfig): SubscriptionConfig => ({
@@ -366,6 +390,8 @@ export const SubscriptionManagement = () => {
     seasons: [],
     latest_season_episode_start: 0,
     latest_season_episode_end: 0,
+    temp_target: emptyStorageTarget("pan123"),
+    delivery_target: emptyStorageTarget("yidong139"),
   })
   const [seasonOptions, setSeasonOptions] = createSignal<number[]>([])
   const [tmdbQuery, setTMDBQuery] = createSignal("")
@@ -496,6 +522,8 @@ export const SubscriptionManagement = () => {
       seasons: [],
       latest_season_episode_start: 0,
       latest_season_episode_end: 0,
+      temp_target: emptyStorageTarget("pan123"),
+      delivery_target: emptyStorageTarget("yidong139"),
     })
     setSeasonOptions([])
     setTMDBQuery("")
@@ -594,12 +622,22 @@ export const SubscriptionManagement = () => {
       notify.warning(t("subscription.episode_range_invalid"))
       return
     }
+    for (const target of [form().temp_target, form().delivery_target]) {
+      const validationKey = storageTargetValidationKey(target, true)
+      if (validationKey) {
+        notify.warning(t(validationKey))
+        return
+      }
+    }
     const sourceConfig =
       formSourceType() === "manual"
         ? sourceConfigWithManualLinks(form().source_config || "", manualLinks)
         : form().source_config || ""
     const payload: Partial<Subscription> = {
       ...form(),
+      target_root: undefined,
+      temp_target: normalizeStorageTargetForSave(form().temp_target),
+      delivery_target: normalizeStorageTargetForSave(form().delivery_target),
       source_type: formSourceType(),
       source_config: sourceConfig,
       name: form().name?.trim(),
@@ -672,6 +710,7 @@ export const SubscriptionManagement = () => {
   }
 
   const submitConfig = async () => {
+    if (!configTargetsAreValid()) return
     const resp = await saveConfig(buildConfigPayload(config()))
     handleResp(resp, (data) => {
       setConfig(fillConfig(data))
@@ -680,12 +719,30 @@ export const SubscriptionManagement = () => {
   }
 
   const saveCurrentConfig = async () => {
+    if (!configTargetsAreValid()) return false
     const resp = await saveConfig(buildConfigPayload(config()))
     if (resp.code !== 200) {
       handleResp(resp)
       return false
     }
     setConfig(fillConfig(resp.data))
+    return true
+  }
+
+  const configTargetsAreValid = () => {
+    const targets = [
+      config().default_target,
+      ...telegramPanItems.map(
+        (item) => config().telegram[item.key].temp_transfer_target,
+      ),
+    ]
+    for (const target of targets) {
+      const validationKey = storageTargetValidationKey(target)
+      if (validationKey) {
+        notify.warning(t(validationKey))
+        return false
+      }
+    }
     return true
   }
 
@@ -1086,6 +1143,20 @@ export const SubscriptionManagement = () => {
                             </VStack>
                           </FormField>
                         </Show>
+                        <StorageTargetFields
+                          label={t("subscription.temp_target")}
+                          value={form().temp_target}
+                          providerOptions={[...tempTransferProviders]}
+                          onChange={(value) => updateForm("temp_target", value)}
+                        />
+                        <StorageTargetFields
+                          label={t("subscription.delivery_target")}
+                          value={form().delivery_target}
+                          providerOptions={[...deliveryProviders]}
+                          onChange={(value) =>
+                            updateForm("delivery_target", value)
+                          }
+                        />
                         <FormField
                           label={t("subscription.check_interval_minutes")}
                         >
@@ -1868,7 +1939,10 @@ const StorageTargetFields = (props: {
         <Select
           value={current().provider || undefined}
           onChange={(value) =>
-            props.onChange({ ...current(), provider: String(value || "") })
+            props.onChange({
+              ...current(),
+              provider: String(value || "") as SubscriptionStorageProvider,
+            })
           }
         >
           <SelectTrigger>
@@ -1895,12 +1969,18 @@ const StorageTargetFields = (props: {
         </Select>
       </FormField>
       <FormField label={`${props.label} · ${t("mobile_share.folder")}`}>
-        <Input
-          value={current().folder || ""}
-          onInput={(e) =>
-            props.onChange({ ...current(), folder: e.currentTarget.value })
-          }
-        />
+        <VStack spacing="$1" alignItems="stretch">
+          <Input
+            value={current().folder || ""}
+            placeholder={t("subscription.storage_target_folder_placeholder")}
+            onInput={(e) =>
+              props.onChange({ ...current(), folder: e.currentTarget.value })
+            }
+          />
+          <Text color="$neutral11" fontSize="$xs">
+            {t("subscription.storage_target_folder_hint")}
+          </Text>
+        </VStack>
       </FormField>
     </Box>
   )
@@ -1995,7 +2075,7 @@ const TelegramPanConfigFields = (props: {
           <StorageTargetFields
             label={t("subscription.temp_transfer_root")}
             value={props.value.temp_transfer_target}
-            providerOptions={[...tempTransferProviders]}
+            providerOptions={[props.panKey]}
             onChange={(value) => props.onChange("temp_transfer_target", value)}
           />
           <FormControl display="flex" flexDirection="column">

@@ -1,4 +1,5 @@
 import {
+  Badge,
   Box,
   Button,
   HStack,
@@ -22,7 +23,11 @@ import {
   Show,
 } from "solid-js"
 import { useFetch, useListFetch, useManageTitle, useT } from "~/hooks"
-import { ClusterNode, ClusterNodeMutableState } from "~/types"
+import {
+  ClusterNode,
+  ClusterNodeMutableState,
+  ClusterProviderAccountInventory,
+} from "~/types"
 import {
   clusterListNodes,
   clusterQueryNodeInventory,
@@ -43,7 +48,7 @@ import { formatDate, shortID } from "./helpers"
 const pollInterval = 10000
 
 const formatBytes = (value?: number) => {
-  if (!value || value <= 0) return "-"
+  if (value === undefined || value < 0) return "-"
   const units = ["B", "KB", "MB", "GB", "TB"]
   let size = value
   let index = 0
@@ -53,6 +58,26 @@ const formatBytes = (value?: number) => {
   }
   return `${size >= 100 || index === 0 ? size.toFixed(0) : size.toFixed(1)} ${units[index]}`
 }
+
+const groupProviderAccounts = (accounts: ClusterProviderAccountInventory[]) => {
+  const grouped = new Map<string, ClusterProviderAccountInventory[]>()
+  accounts.forEach((account) => {
+    const provider = account.provider || "-"
+    const providerAccounts = grouped.get(provider)
+    if (providerAccounts) {
+      providerAccounts.push(account)
+    } else {
+      grouped.set(provider, [account])
+    }
+  })
+  return Array.from(grouped, ([provider, providerAccounts]) => ({
+    provider,
+    accounts: providerAccounts,
+  }))
+}
+
+const isHealthyAccount = (status: string) =>
+  status.trim().toLowerCase() === "work"
 
 const Nodes = () => {
   const t = useT()
@@ -111,6 +136,7 @@ const Nodes = () => {
   const NodeInventorySummary = (props: { node: ClusterNode }) => {
     const inventory = () => props.node.latest_inventory
     const accounts = () => inventory()?.provider_accounts || []
+    const accountGroups = createMemo(() => groupProviderAccounts(accounts()))
     const capabilities = () => inventory()?.capabilities
     return (
       <VStack alignItems="stretch" spacing="$1" minW="0">
@@ -131,38 +157,102 @@ const Nodes = () => {
             </Text>
           }
         >
-          <For each={accounts()}>
-            {(account) => (
-              <Box
-                px="$2"
-                py="$1"
-                rounded="$sm"
-                bgColor="$neutral3"
-                css={{ wordBreak: "break-word" }}
-              >
-                <Text size="xs" fontWeight="$medium">
-                  {[
-                    account.provider,
-                    account.account_alias || account.mount_path,
-                  ]
-                    .filter(Boolean)
-                    .join(" · ")}
+          <For each={accountGroups()}>
+            {(group) => (
+              <VStack alignItems="stretch" spacing="$1">
+                <Text size="xs" fontWeight="$semibold">
+                  {group.provider}
                 </Text>
-                <Text size="xs" color="$neutral11">
-                  {[
-                    account.membership_tier || account.status,
-                    account.supports_upload ? "upload" : "",
-                    account.supports_share_save ? "save" : "",
-                    account.supports_etf ? "ETF" : "",
-                    account.max_single_upload_bytes
-                      ? formatBytes(account.max_single_upload_bytes)
-                      : "",
-                    account.free_bytes ? formatBytes(account.free_bytes) : "",
-                  ]
-                    .filter(Boolean)
-                    .join(" · ")}
-                </Text>
-              </Box>
+                <For each={group.accounts}>
+                  {(account) => (
+                    <Box
+                      px="$2"
+                      py="$2"
+                      rounded="$sm"
+                      borderWidth="1px"
+                      borderColor={
+                        isHealthyAccount(account.status)
+                          ? "$neutral5"
+                          : "$danger7"
+                      }
+                      bgColor="$neutral3"
+                      css={{ wordBreak: "break-word" }}
+                    >
+                      <HStack
+                        spacing="$2"
+                        flexWrap="wrap"
+                        justifyContent="space-between"
+                      >
+                        <Text size="xs" fontWeight="$medium">
+                          {t("cluster.nodes.account_alias")}:{" "}
+                          {account.account_alias || account.mount_path || "-"}
+                        </Text>
+                        <Text size="xs" color="$neutral11" fontFamily="$mono">
+                          {t("cluster.nodes.storage_id")}: {account.storage_id}
+                        </Text>
+                      </HStack>
+                      <HStack mt="$1" spacing="$2" flexWrap="wrap">
+                        <Text size="xs" color="$neutral11">
+                          {t("cluster.nodes.membership_tier")}:{" "}
+                          {account.membership_tier || "-"}
+                        </Text>
+                        <Badge
+                          colorScheme={
+                            isHealthyAccount(account.status)
+                              ? "success"
+                              : "danger"
+                          }
+                        >
+                          {t("cluster.fields.status")}: {account.status || "-"}
+                        </Badge>
+                      </HStack>
+                      <HStack mt="$1" spacing="$2" flexWrap="wrap">
+                        <Text size="xs" color="$neutral11">
+                          {t("cluster.nodes.free_total_bytes")}:{" "}
+                          {formatBytes(account.free_bytes)} /{" "}
+                          {formatBytes(account.total_bytes)}
+                        </Text>
+                        <Text size="xs" color="$neutral11">
+                          {t("cluster.nodes.active_jobs")}:{" "}
+                          {account.active_jobs ?? 0}
+                        </Text>
+                      </HStack>
+                      <Show
+                        when={
+                          account.provider.trim().toLowerCase() === "yidong139"
+                        }
+                      >
+                        <Text mt="$1" size="xs" color="$neutral11">
+                          {t("cluster.nodes.single_upload_limit")}:{" "}
+                          {formatBytes(account.max_single_upload_bytes)}
+                        </Text>
+                      </Show>
+                      <HStack mt="$1" spacing="$1" flexWrap="wrap">
+                        <Show when={account.supports_share_save}>
+                          <Badge colorScheme="info">
+                            {t("cluster.nodes.capabilities.share_save")}
+                          </Badge>
+                        </Show>
+                        <Show when={account.supports_download}>
+                          <Badge colorScheme="info">
+                            {t("cluster.nodes.capabilities.download")}
+                          </Badge>
+                        </Show>
+                        <Show when={account.supports_upload}>
+                          <Badge colorScheme="info">
+                            {t("cluster.nodes.capabilities.upload")}
+                          </Badge>
+                        </Show>
+                        <Show when={account.supports_etf}>
+                          <Badge colorScheme="info">
+                            {t("cluster.nodes.capabilities.etf")}
+                          </Badge>
+                        </Show>
+                      </HStack>
+                    </Box>
+                  )}
+                </For>
+              </VStack>
             )}
           </For>
         </Show>

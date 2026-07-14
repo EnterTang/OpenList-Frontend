@@ -57,6 +57,18 @@
     "session": "Session",
     "key": "Node key",
     "inventory": "Mount inventory",
+    "account_alias": "Account",
+    "storage_id": "Storage ID",
+    "membership_tier": "Membership",
+    "free_total_bytes": "Free / total",
+    "active_jobs": "Active tasks",
+    "single_upload_limit": "Single-file upload limit",
+    "capabilities": {
+      "share_save": "Share save",
+      "download": "Download",
+      "upload": "Upload",
+      "etf": "ETF"
+    },
     "last_error": "Last error",
     "state_updated": "Worker state updated",
     "inventory_requested": "Mount inventory query sent",

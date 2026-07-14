@@ -57,6 +57,18 @@
     "session": "会话",
     "key": "节点密钥",
     "inventory": "网盘挂载",
+    "account_alias": "账号",
+    "storage_id": "存储 ID",
+    "membership_tier": "会员等级",
+    "free_total_bytes": "可用 / 总容量",
+    "active_jobs": "执行中任务",
+    "single_upload_limit": "单文件上传上限",
+    "capabilities": {
+      "share_save": "转存",
+      "download": "下载",
+      "upload": "上传",
+      "etf": "ETF"
+    },
     "last_error": "最近错误",
     "state_updated": "Worker 状态已更新",
     "inventory_requested": "已发送挂载查询请求",

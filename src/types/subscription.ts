@@ -2,8 +2,15 @@ export type SubscriptionSourceType = "manual" | "telegram" | "pansou"
 export type SubscriptionStatus = "idle" | "running" | "success" | "failed"
 export type SubscriptionMediaType = "tv" | "movie"
 
+export type SubscriptionStorageProvider =
+  | "pan123"
+  | "pan115"
+  | "yidong139"
+  | "quark"
+  | "aliyun_drive"
+
 export interface SubscriptionStorageTarget {
-  provider?: string
+  provider?: SubscriptionStorageProvider
   folder?: string
 }
 
@@ -16,7 +23,9 @@ export interface Subscription {
   source_config: string
   active: boolean
   check_interval_minutes: number
-  target_root: string
+  target_root?: string
+  temp_target?: SubscriptionStorageTarget
+  delivery_target?: SubscriptionStorageTarget
   transfer_enabled: boolean
   tmdb_id: number
   tmdb_name: string
