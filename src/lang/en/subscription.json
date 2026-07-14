@@ -39,6 +39,8 @@
   "default_target_root": "Default delivery target",
   "temp_target": "Temporary storage target",
   "delivery_target": "Final upload target",
+  "worker_storage_routing": "Worker-managed storage",
+  "worker_storage_routing_hint": "The worker assigned to this subscription selects its own temporary-transfer and final-upload folders. In each worker's local subscription configuration, set temporary folders for Pan123/Pan115 and the default upload folder for 139.",
   "storage_target_required": "Select a provider and enter its in-drive folder",
   "storage_target_folder_placeholder": "Folder inside the drive, for example TV/Drama",
   "storage_target_folder_hint": "Enter an in-drive folder, not an OpenList mount path.",

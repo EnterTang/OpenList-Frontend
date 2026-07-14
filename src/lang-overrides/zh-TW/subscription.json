@@ -2,6 +2,8 @@
   "default_target_root": "默認目標根目錄",
   "temp_target": "臨時轉存目標",
   "delivery_target": "最終上傳目標",
+  "worker_storage_routing": "工作節點儲存路由",
+  "worker_storage_routing_hint": "暫存轉存和最終上傳目錄由執行工作的節點自行選擇。請在各工作節點的本機訂閱設定中為 123/115 設定暫存轉存目錄，並為 139 設定預設上傳目錄。",
   "storage_target_required": "請選擇網盤類型並填寫盤內目錄",
   "storage_target_folder_placeholder": "盤內目錄，例如：劇集/港台劇",
   "storage_target_folder_hint": "填寫網盤內目錄，不是 OpenList 掛載路徑。",

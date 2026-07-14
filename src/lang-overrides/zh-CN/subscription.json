@@ -38,6 +38,8 @@
   "target_root": "目标根目录",
   "temp_target": "临时转存目标",
   "delivery_target": "最终上传目标",
+  "worker_storage_routing": "工作节点存储路由",
+  "worker_storage_routing_hint": "临时转存和最终上传目录由执行任务的工作节点自行选择。请在各工作节点的本地订阅配置中为 123/115 设置临时转存目录，并为 139 设置默认上传目录。",
   "storage_target_required": "请选择网盘类型并填写盘内目录",
   "storage_target_folder_placeholder": "盘内目录，例如：剧集/港台剧",
   "storage_target_folder_hint": "填写网盘内目录，不是 OpenList 挂载路径。",

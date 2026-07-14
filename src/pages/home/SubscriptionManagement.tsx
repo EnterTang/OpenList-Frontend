@@ -90,7 +90,6 @@ const tabItems: { key: SubscriptionTab; icon: typeof AiOutlineReload }[] = [
 const sourceTypes: SubscriptionSourceType[] = ["manual", "telegram", "pansou"]
 const mediaTypes: SubscriptionMediaType[] = ["tv", "movie"]
 const deliveryProviders = ["yidong139"] as const
-const tempTransferProviders = ["pan123", "pan115"] as const
 type TelegramPanKey = "quark" | "aliyun_drive" | "pan123" | "pan115"
 type TelegramPanConfig = SubscriptionConfig["telegram"]["quark"]
 
@@ -390,8 +389,6 @@ export const SubscriptionManagement = () => {
     seasons: [],
     latest_season_episode_start: 0,
     latest_season_episode_end: 0,
-    temp_target: emptyStorageTarget("pan123"),
-    delivery_target: emptyStorageTarget("yidong139"),
   })
   const [seasonOptions, setSeasonOptions] = createSignal<number[]>([])
   const [tmdbQuery, setTMDBQuery] = createSignal("")
@@ -522,8 +519,6 @@ export const SubscriptionManagement = () => {
       seasons: [],
       latest_season_episode_start: 0,
       latest_season_episode_end: 0,
-      temp_target: emptyStorageTarget("pan123"),
-      delivery_target: emptyStorageTarget("yidong139"),
     })
     setSeasonOptions([])
     setTMDBQuery("")
@@ -622,13 +617,6 @@ export const SubscriptionManagement = () => {
       notify.warning(t("subscription.episode_range_invalid"))
       return
     }
-    for (const target of [form().temp_target, form().delivery_target]) {
-      const validationKey = storageTargetValidationKey(target, true)
-      if (validationKey) {
-        notify.warning(t(validationKey))
-        return
-      }
-    }
     const sourceConfig =
       formSourceType() === "manual"
         ? sourceConfigWithManualLinks(form().source_config || "", manualLinks)
@@ -636,8 +624,11 @@ export const SubscriptionManagement = () => {
     const payload: Partial<Subscription> = {
       ...form(),
       target_root: undefined,
-      temp_target: normalizeStorageTargetForSave(form().temp_target),
-      delivery_target: normalizeStorageTargetForSave(form().delivery_target),
+      // Storage routing belongs to the worker that executes the transfer.
+      // Omit legacy per-subscription targets so coordinator configuration
+      // cannot override a worker's local storage setup.
+      temp_target: undefined,
+      delivery_target: undefined,
       source_type: formSourceType(),
       source_config: sourceConfig,
       name: form().name?.trim(),
@@ -1143,20 +1134,14 @@ export const SubscriptionManagement = () => {
                             </VStack>
                           </FormField>
                         </Show>
-                        <StorageTargetFields
-                          label={t("subscription.temp_target")}
-                          value={form().temp_target}
-                          providerOptions={[...tempTransferProviders]}
-                          onChange={(value) => updateForm("temp_target", value)}
-                        />
-                        <StorageTargetFields
-                          label={t("subscription.delivery_target")}
-                          value={form().delivery_target}
-                          providerOptions={[...deliveryProviders]}
-                          onChange={(value) =>
-                            updateForm("delivery_target", value)
-                          }
-                        />
+                        <FormField
+                          label={t("subscription.worker_storage_routing")}
+                          full
+                        >
+                          <Text color="$neutral11" fontSize="$sm">
+                            {t("subscription.worker_storage_routing_hint")}
+                          </Text>
+                        </FormField>
                         <FormField
                           label={t("subscription.check_interval_minutes")}
                         >
