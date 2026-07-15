@@ -20,10 +20,13 @@ import {
   MobileShareDeleteResult,
   MobileShareRecord,
   Subscription,
+  SubscriptionBoard,
   SubscriptionConfig,
   SubscriptionDetail,
+  SubscriptionEpisodeSource,
   SubscriptionTelegramAuthResp,
   SubscriptionRun,
+  SubscriptionRunQuery,
   SubscriptionRunResult,
   SubscriptionResourceSearchResp,
   SubscriptionSourceType,
@@ -401,6 +404,7 @@ export const subscriptionList = (
     keyword?: string
     source_type?: string
     active?: string
+    archive_status?: string
     page?: number
     per_page?: number
   } = {},
@@ -436,14 +440,23 @@ export const subscriptionCheck = (
 }
 
 export const subscriptionRuns = (
-  params: {
-    subscription_id?: number
-    status?: string
-    page?: number
-    per_page?: number
-  } = {},
+  params: SubscriptionRunQuery = {},
 ): PPageResp<SubscriptionRun> => {
   return r.get("/admin/subscription/runs", { params })
+}
+
+export const subscriptionBoard = (
+  params: SubscriptionRunQuery = {},
+): PResp<SubscriptionBoard> => {
+  return r.get("/admin/subscription/board", { params })
+}
+
+export const subscriptionEpisodeSources = (
+  subscriptionID: number,
+): PResp<{ content: SubscriptionEpisodeSource[] }> => {
+  return r.get("/admin/subscription/episode_sources", {
+    params: { subscription_id: subscriptionID },
+  })
 }
 
 export const subscriptionRunDelete = (id: number): PEmptyResp => {

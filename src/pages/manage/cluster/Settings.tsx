@@ -59,9 +59,13 @@ const emptyConfig = (): ClusterRuntimeConfig => ({
   },
 })
 
-const Settings = () => {
-  const t = useT()
+const ClusterPageTitle = () => {
   useManageTitle("cluster.settings.title")
+  return null
+}
+
+const Settings = (props: { embedded?: boolean } = {}) => {
+  const t = useT()
   const [config, setConfig] = createSignal<ClusterRuntimeConfig>(emptyConfig())
   const [enrollmentToken, setEnrollmentToken] = createSignal("")
   const [targetToken, setTargetToken] = createSignal("")
@@ -186,10 +190,13 @@ const Settings = () => {
 
   return (
     <VStack w="$full" alignItems="stretch" spacing="$4" pb="$6">
-      <PageHeader
-        titleKey="cluster.settings.title"
-        descriptionKey="cluster.settings.description"
-      />
+      <Show when={!props.embedded}>
+        <ClusterPageTitle />
+        <PageHeader
+          titleKey="cluster.settings.title"
+          descriptionKey="cluster.settings.description"
+        />
+      </Show>
 
       <Show when={!loading()} fallback={<LoadingBlock />}>
         <Alert status="warning">

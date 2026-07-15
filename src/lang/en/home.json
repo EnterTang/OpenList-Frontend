@@ -66,7 +66,16 @@
     "subscriptions": "Subscription management",
     "mobile_share": "Mobile share management",
     "resource_search": "Subscription source search",
-    "task_board": "Task board"
+    "task_board": "Task board",
+    "cluster_control": "Cluster control"
+  },
+  "cluster_control": {
+    "tabs": {
+      "overview": "Overview",
+      "nodes": "Worker nodes",
+      "tasks": "Task board",
+      "settings": "Cluster settings"
+    }
   },
   "no_images": "No images in the current folder",
   "load_more": "Load more",

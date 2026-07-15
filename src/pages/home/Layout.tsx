@@ -9,7 +9,7 @@ import { Header } from "./header/Header"
 import { MobileShareManagement } from "./mobile_share/MobileShareManagement"
 import ResourceSearch from "../manage/subscription/ResourceSearch"
 import { SubscriptionManagement } from "./SubscriptionManagement"
-import TransferTasks from "../manage/subscription/TransferTasks"
+import { ClusterControl } from "./ClusterControl"
 import { Toolbar } from "./toolbar/Toolbar"
 import { Box, HStack, VStack } from "@hope-ui/solid"
 import { createSignal, JSXElement, Match, Switch } from "solid-js"
@@ -17,12 +17,13 @@ import { Container } from "./Container"
 
 const initialHomePage = (): HomePageKey => {
   const stored = localStorage.getItem("home_app_page")
+  if (stored === "task_board") return "cluster_control"
   if (
     stored === "netdisk" ||
     stored === "subscriptions" ||
     stored === "mobile_share" ||
     stored === "resource_search" ||
-    stored === "task_board"
+    stored === "cluster_control"
   ) {
     return stored
   }
@@ -77,12 +78,9 @@ const Index = () => {
                 />
               </HomeContentPanel>
             </Match>
-            <Match when={activePage() === "task_board"}>
+            <Match when={activePage() === "cluster_control"}>
               <HomeContentPanel>
-                <TransferTasks
-                  titleKey="home.sidebar.task_board"
-                  titleMode="site"
-                />
+                <ClusterControl />
               </HomeContentPanel>
             </Match>
           </Switch>

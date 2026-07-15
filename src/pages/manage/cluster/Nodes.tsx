@@ -79,9 +79,13 @@ const groupProviderAccounts = (accounts: ClusterProviderAccountInventory[]) => {
 const isHealthyAccount = (status: string) =>
   status.trim().toLowerCase() === "work"
 
-const Nodes = () => {
-  const t = useT()
+const ClusterPageTitle = () => {
   useManageTitle("cluster.nodes.title")
+  return null
+}
+
+const Nodes = (props: { embedded?: boolean } = {}) => {
+  const t = useT()
   const [nodes, setNodes] = createSignal<ClusterNode[]>([])
   const [loading, loadNodes] = useFetch(clusterListNodes, true)
   const [queryingID, queryInventory] = useListFetch(clusterQueryNodeInventory)
@@ -327,20 +331,23 @@ const Nodes = () => {
 
   return (
     <VStack w="$full" alignItems="stretch" spacing="$4" pb="$6">
-      <PageHeader
-        titleKey="cluster.nodes.title"
-        descriptionKey="cluster.nodes.description"
-        actions={
-          <Button
-            leftIcon={<AiOutlineReload />}
-            variant="outline"
-            loading={loading()}
-            onClick={refresh}
-          >
-            {t("cluster.actions.refresh")}
-          </Button>
-        }
-      />
+      <Show when={!props.embedded}>
+        <ClusterPageTitle />
+        <PageHeader
+          titleKey="cluster.nodes.title"
+          descriptionKey="cluster.nodes.description"
+          actions={
+            <Button
+              leftIcon={<AiOutlineReload />}
+              variant="outline"
+              loading={loading()}
+              onClick={refresh}
+            >
+              {t("cluster.actions.refresh")}
+            </Button>
+          }
+        />
+      </Show>
 
       <SimpleGrid columns={{ "@initial": 2, "@lg": 4 }} gap="$3">
         <Metric labelKey="cluster.metrics.total_nodes" value={nodes().length} />

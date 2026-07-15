@@ -6,7 +6,16 @@
     "subscriptions": "订阅管理",
     "mobile_share": "移动分享管理",
     "resource_search": "订阅源搜索",
-    "task_board": "任务看板"
+    "task_board": "任务看板",
+    "cluster_control": "集群控制"
+  },
+  "cluster_control": {
+    "tabs": {
+      "overview": "总览",
+      "nodes": "Worker 节点",
+      "tasks": "任务看板",
+      "settings": "集群配置"
+    }
   },
   "toolbar": {
     "mobile_share": "创建移动分享链接",

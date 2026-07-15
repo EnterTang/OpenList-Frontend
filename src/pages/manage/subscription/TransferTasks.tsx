@@ -2,10 +2,29 @@ import {
   Badge,
   Box,
   Button,
-  Divider,
-  Grid,
+  Drawer,
+  DrawerBody,
+  DrawerCloseButton,
+  DrawerContent,
+  DrawerHeader,
+  DrawerOverlay,
   HStack,
   Input,
+  Popover,
+  PopoverArrow,
+  PopoverBody,
+  PopoverContent,
+  PopoverTrigger,
+  Select,
+  SelectContent,
+  SelectIcon,
+  SelectListbox,
+  SelectOption,
+  SelectOptionIndicator,
+  SelectOptionText,
+  SelectPlaceholder,
+  SelectTrigger,
+  SelectValue,
   SimpleGrid,
   Table,
   Tbody,
@@ -15,9 +34,9 @@ import {
   Thead,
   Tr,
   VStack,
+  createDisclosure,
   useColorModeValue,
 } from "@hope-ui/solid"
-import { AiOutlineDelete, AiOutlineReload } from "solid-icons/ai"
 import {
   createEffect,
   createMemo,
@@ -27,19 +46,25 @@ import {
   onMount,
   Show,
 } from "solid-js"
+import {
+  AiOutlineDelete,
+  AiOutlineReload,
+  AiOutlineWarning,
+} from "solid-icons/ai"
 import { useFetch, useListFetch, useT, useTitle } from "~/hooks"
 import { getSetting } from "~/store"
 import {
   Subscription,
-  SubscriptionItem,
+  SubscriptionBoard,
   SubscriptionRun,
+  SubscriptionRunQuery,
   SubscriptionSourceType,
   SubscriptionStatus,
 } from "~/types"
 import {
   handleResp,
   notify,
-  subscriptionGet,
+  subscriptionBoard,
   subscriptionList,
   subscriptionRunDelete,
   subscriptionRuns,
@@ -56,49 +81,25 @@ const statusColor: Record<
   failed: "danger",
 }
 
-const statusAccent: Record<SubscriptionStatus, string> = {
-  idle: "$neutral9",
-  running: "$info9",
-  success: "$success9",
-  failed: "$danger9",
-}
-
 const statuses: SubscriptionStatus[] = ["running", "failed", "success", "idle"]
 const sources: SubscriptionSourceType[] = ["manual", "telegram", "pansou"]
+
 type StatusFilter = "all" | SubscriptionStatus
 type SourceFilter = "all" | SubscriptionSourceType
 
-const TransferTasks = (props: {
+const emptyBoard = (): SubscriptionBoard => ({
+  subscription_count: 0,
+  changed_run_count: 0,
+  added_count: 0,
+  changed_count: 0,
+  failure_count: 0,
+})
+
+const TransferTasksTitle = (props: {
   titleKey?: string
   titleMode?: "manage" | "site"
 }) => {
   const t = useT()
-  const border = useColorModeValue("$neutral5", "$neutral7")
-  const panelBg = useColorModeValue("white", "$neutral3")
-  const mutedBg = useColorModeValue("$neutral2", "$neutral4")
-  const chartBg = useColorModeValue("$neutral4", "$neutral6")
-  const failureBg = useColorModeValue("$danger2", "$neutral3")
-  const [subscriptions, setSubscriptions] = createSignal<Subscription[]>([])
-  const [runs, setRuns] = createSignal<SubscriptionRun[]>([])
-  const [statusFilter, setStatusFilter] = createSignal<StatusFilter>("all")
-  const [sourceFilter, setSourceFilter] = createSignal<SourceFilter>("all")
-  const [keyword, setKeyword] = createSignal("")
-  const [selectedSubscriptionID, setSelectedSubscriptionID] =
-    createSignal<number>()
-  const [episodeItems, setEpisodeItems] = createSignal<
-    Record<number, SubscriptionItem[]>
-  >({})
-  const [subsLoading, loadSubscriptions] = useFetch(() =>
-    subscriptionList({ page: 1, per_page: 0 }),
-  )
-  const [runsLoading, loadRuns] = useFetch(() =>
-    subscriptionRuns({ page: 1, per_page: 30 }),
-  )
-  const [itemsLoading, loadSubscription] = useFetch(subscriptionGet)
-  const [deletingRunID, deleteRun] = useListFetch(subscriptionRunDelete)
-  const [clearFailedLoading, clearFailedRuns] = useFetch(
-    subscriptionRunsClearFailed,
-  )
   useTitle(
     () =>
       `${t(props.titleKey || "manage.sidemenu.transfer_tasks")} | ${
@@ -107,138 +108,105 @@ const TransferTasks = (props: {
           : t("manage.title")
       }`,
   )
+  return null
+}
 
-  const refresh = async () => {
-    const subsResp = await loadSubscriptions()
-    handleResp(subsResp, (data) => setSubscriptions(data.content || []))
-    const runsResp = await loadRuns()
-    handleResp(runsResp, (data) => setRuns(data.content || []))
-  }
+const TransferTasks = (props: {
+  titleKey?: string
+  titleMode?: "manage" | "site"
+  embedded?: boolean
+}) => {
+  const t = useT()
+  const failureDrawer = createDisclosure()
+  const border = useColorModeValue("$neutral5", "$neutral7")
+  const panelBg = useColorModeValue("white", "$neutral3")
+  const mutedBg = useColorModeValue("$neutral2", "$neutral4")
+  const failureBg = useColorModeValue("$danger1", "$neutral3")
+  const [subscriptions, setSubscriptions] = createSignal<Subscription[]>([])
+  const [board, setBoard] = createSignal<SubscriptionBoard>(emptyBoard())
+  const [changeRuns, setChangeRuns] = createSignal<SubscriptionRun[]>([])
+  const [failureRuns, setFailureRuns] = createSignal<SubscriptionRun[]>([])
+  const [selectedSubscriptionID, setSelectedSubscriptionID] =
+    createSignal("all")
+  const [statusFilter, setStatusFilter] = createSignal<StatusFilter>("all")
+  const [sourceFilter, setSourceFilter] = createSignal<SourceFilter>("all")
+  const [keyword, setKeyword] = createSignal("")
+  const [isMobile, setIsMobile] = createSignal(false)
+  const [subscriptionsLoading, loadSubscriptions] = useFetch(subscriptionList)
+  const [boardLoading, loadBoard] = useFetch(subscriptionBoard)
+  const [changesLoading, loadChanges] = useFetch(subscriptionRuns)
+  const [failuresLoading, loadFailures] = useFetch(subscriptionRuns)
+  const [deletingRunID, deleteRun] = useListFetch(subscriptionRunDelete)
+  const [clearFailedLoading, clearFailedRuns] = useFetch(
+    subscriptionRunsClearFailed,
+  )
+  let requestID = 0
 
-  const subscriptionName = (id: number) =>
-    subscriptions().find((item) => item.id === id)?.name || `#${id}`
-  const subscriptionByID = createMemo(() => {
-    const map: Record<number, Subscription> = {}
-    subscriptions().forEach((item) => {
-      map[item.id] = item
-    })
-    return map
+  const query = createMemo<SubscriptionRunQuery>(() => {
+    const next: SubscriptionRunQuery = {}
+    const trimmedKeyword = keyword().trim()
+    const subscriptionID = Number(selectedSubscriptionID())
+    const source = sourceFilter()
+    const status = statusFilter()
+    if (selectedSubscriptionID() !== "all" && subscriptionID > 0) {
+      next.subscription_id = subscriptionID
+    }
+    if (source !== "all") {
+      next.source_type = source
+    }
+    if (status !== "all") {
+      next.status = status
+    }
+    if (trimmedKeyword) {
+      next.keyword = trimmedKeyword
+    }
+    return next
   })
 
-  const toggleEpisodeSources = async (id: number) => {
-    if (selectedSubscriptionID() === id) {
-      setSelectedSubscriptionID(undefined)
-      return
-    }
-    setSelectedSubscriptionID(id)
-    if (episodeItems()[id]) return
-    const resp = await loadSubscription(id)
-    handleResp(resp, (data) =>
-      setEpisodeItems((current) => ({
-        ...current,
-        [id]: data.items || [],
-      })),
+  const refresh = async (currentQuery: SubscriptionRunQuery = query()) => {
+    const currentRequestID = ++requestID
+    const [subscriptionsResp, boardResp, changesResp, failuresResp] =
+      await Promise.all([
+        loadSubscriptions({
+          source_type: currentQuery.source_type,
+          page: 1,
+          per_page: 0,
+        }),
+        loadBoard(currentQuery),
+        loadChanges({
+          ...currentQuery,
+          view: "changes",
+          page: 1,
+          per_page: 30,
+        }),
+        loadFailures({
+          ...currentQuery,
+          view: "failures",
+          page: 1,
+          per_page: 8,
+        }),
+      ])
+
+    if (currentRequestID !== requestID) return
+
+    handleResp(subscriptionsResp, (data) =>
+      setSubscriptions(data.content || []),
     )
+    handleResp(boardResp, (data) => setBoard(data || emptyBoard()))
+    handleResp(changesResp, (data) => setChangeRuns(data.content || []))
+    handleResp(failuresResp, (data) => setFailureRuns(data.content || []))
   }
 
-  const episodeLabel = (item: SubscriptionItem) => {
-    if (item.season > 0 && item.episode > 0) {
-      return `S${String(item.season).padStart(2, "0")}E${String(
-        item.episode,
-      ).padStart(2, "0")}`
-    }
-    return item.file_name || item.source_path || `#${item.id}`
-  }
-
-  const episodeProviderLabel = (item: SubscriptionItem) => {
-    const provider = item.source_provider?.trim()
-    if (["quark", "aliyun_drive", "pan123", "pan115"].includes(provider)) {
-      return t(`subscription.telegram_pan_names.${provider}`)
-    }
-    return provider || "-"
-  }
-
-  const keywordMatched = (subscription?: Subscription) => {
-    const value = keyword().trim().toLowerCase()
-    if (!value) return true
-    return [
-      subscription?.name,
-      subscription?.tmdb_name,
-      subscription?.category,
-      subscription?.source_type,
-    ]
-      .filter(Boolean)
-      .some((item) => String(item).toLowerCase().includes(value))
-  }
-
-  const sourceMatched = (subscription?: Subscription) =>
-    sourceFilter() === "all" || subscription?.source_type === sourceFilter()
-
-  const statusMatched = (status?: SubscriptionStatus) =>
-    statusFilter() === "all" || status === statusFilter()
-
-  const filteredSubscriptions = createMemo(() =>
-    subscriptions().filter(
-      (item) =>
-        keywordMatched(item) &&
-        sourceMatched(item) &&
-        statusMatched(item.last_status || "idle"),
-    ),
-  )
-
-  const filteredRuns = createMemo(() =>
-    runs().filter((run) => {
-      const subscription = subscriptionByID()[run.subscription_id]
-      return (
-        keywordMatched(subscription) &&
-        sourceMatched(subscription) &&
-        statusMatched(run.status)
-      )
-    }),
-  )
-
-  const failedRuns = createMemo(() =>
-    filteredRuns()
-      .filter((run) => run.status === "failed" || run.error)
-      .slice(0, 6),
-  )
-
-  const statusStats = createMemo(() =>
-    statuses.map((status) => ({
-      status,
-      subscriptions: filteredSubscriptions().filter(
-        (item) => (item.last_status || "idle") === status,
-      ).length,
-      runs: filteredRuns().filter((run) => run.status === status).length,
-    })),
-  )
-
-  const sourceStats = createMemo(() =>
-    sources.map((source) => ({
-      source,
-      count: filteredSubscriptions().filter(
-        (item) => item.source_type === source,
-      ).length,
-    })),
-  )
-
-  const runTotals = createMemo(() =>
-    filteredRuns().reduce(
-      (acc, run) => ({
-        added: acc.added + run.added_count,
-        changed: acc.changed + run.changed_count,
-        transferred: acc.transferred + run.transferred_count,
-      }),
-      { added: 0, changed: 0, transferred: 0 },
-    ),
-  )
-
-  const statusTotal = createMemo(
+  const isRefreshing = createMemo(
     () =>
-      statusStats().reduce(
-        (acc, item) => acc + item.subscriptions + item.runs,
-        0,
-      ) || 1,
+      subscriptionsLoading() ||
+      boardLoading() ||
+      changesLoading() ||
+      failuresLoading(),
+  )
+
+  const hasActiveWork = createMemo(() =>
+    subscriptions().some((item) => item.last_status === "running"),
   )
 
   const formatDate = (value?: string) => {
@@ -260,63 +228,68 @@ const TransferTasks = (props: {
     return `${Math.floor(seconds / 60)}m ${seconds % 60}s`
   }
 
-  const removeFailedRun = async (run: SubscriptionRun) => {
-    if (!confirm(t("subscription.board_clear_failure_confirm"))) return
-    const resp = await deleteRun(run.id)
+  const deleteFailure = async (runID: number, onClose?: () => void) => {
+    const resp = await deleteRun(runID)
     handleResp(resp, () => {
-      setRuns((current) => current.filter((item) => item.id !== run.id))
       notify.success(t("subscription.board_failure_cleared"))
+      onClose?.()
+      void refresh(query())
     })
   }
 
-  const clearFailureQueue = async () => {
-    if (!confirm(t("subscription.board_clear_failure_queue_confirm"))) return
+  const clearFailures = async (onClose?: () => void) => {
     const resp = await clearFailedRuns()
     handleResp(resp, () => {
-      setRuns((current) =>
-        current.filter((run) => run.status !== "failed" && !run.error),
-      )
       notify.success(t("subscription.board_failure_queue_cleared"))
+      onClose?.()
+      failureDrawer.onClose()
+      void refresh(query())
     })
   }
 
-  const StatusBadge = (props: { status: SubscriptionStatus }) => (
-    <Badge colorScheme={statusColor[props.status]}>
-      {t(`subscription.statuses.${props.status}`)}
-    </Badge>
-  )
+  createEffect(() => {
+    void refresh(query())
+  })
 
-  const FilterButton = (props: {
-    active: boolean
-    onClick: () => void
-    children: any
-  }) => (
-    <Button
-      size="sm"
-      variant={props.active ? "solid" : "subtle"}
-      colorScheme={props.active ? "accent" : "neutral"}
-      onClick={props.onClick}
-    >
-      {props.children}
-    </Button>
-  )
-
-  const hasActiveWork = createMemo(
-    () =>
-      subscriptions().some((item) => item.last_status === "running") ||
-      runs().some((run) => run.status === "running"),
-  )
-
-  onMount(refresh)
+  createEffect(() => {
+    if (board().failure_count > 0) return
+    failureDrawer.onClose()
+  })
 
   createEffect(() => {
     if (!hasActiveWork()) return
-    const interval = setInterval(refresh, 5000)
+    const interval = setInterval(() => {
+      void refresh(query())
+    }, 5000)
     onCleanup(() => clearInterval(interval))
   })
 
+  onMount(() => {
+    const media = window.matchMedia("(max-width: 767px)")
+    const sync = () => setIsMobile(media.matches)
+    sync()
+    if (typeof media.addEventListener === "function") {
+      media.addEventListener("change", sync)
+      onCleanup(() => media.removeEventListener("change", sync))
+      return
+    }
+    media.addListener(sync)
+    onCleanup(() => media.removeListener(sync))
+  })
+
   return (
-    <VStack w="$full" alignItems="stretch" spacing="$4">
+    <VStack
+      w="$full"
+      alignItems="stretch"
+      spacing="$4"
+      pb={board().failure_count > 0 ? "$20" : "$0"}
+    >
+      <Show when={!props.embedded}>
+        <TransferTasksTitle
+          titleKey={props.titleKey}
+          titleMode={props.titleMode}
+        />
+      </Show>
       <Box
         w="$full"
         bgColor={panelBg()}
@@ -325,20 +298,17 @@ const TransferTasks = (props: {
         rounded="$lg"
         p={{ "@initial": "$3", "@md": "$4" }}
       >
-        <VStack spacing="$5" alignItems="stretch">
-          <HStack justifyContent="space-between" gap="$2" flexWrap="wrap">
+        <VStack spacing="$4" alignItems="stretch">
+          <HStack justifyContent="space-between" gap="$3" flexWrap="wrap">
             <Box>
               <Text fontWeight="$semibold" fontSize="$xl">
                 {t("subscription.transfer_tasks_overview")}
               </Text>
-              <Text color="$neutral11" fontSize="$sm">
-                {t("subscription.task_board_description")}
-              </Text>
             </Box>
             <Button
               leftIcon={<AiOutlineReload />}
-              loading={subsLoading() || runsLoading()}
-              onClick={refresh}
+              loading={isRefreshing()}
+              onClick={() => void refresh(query())}
             >
               {t("global.refresh")}
             </Button>
@@ -347,37 +317,22 @@ const TransferTasks = (props: {
           <SimpleGrid columns={{ "@initial": 1, "@md": 2, "@xl": 4 }} gap="$3">
             <MetricCard
               label={t("subscription.board_total_subscriptions")}
-              value={filteredSubscriptions().length}
-              detail={`${subscriptions().length} ${t(
-                "subscription.board_total_loaded",
-              )}`}
+              value={board().subscription_count}
               bgColor={mutedBg()}
             />
             <MetricCard
-              label={t("subscription.board_recent_runs")}
-              value={filteredRuns().length}
-              detail={`${runs().length} ${t("subscription.board_recent_loaded")}`}
+              label={t("subscription.board_changed_runs")}
+              value={board().changed_run_count}
               bgColor={mutedBg()}
             />
             <MetricCard
-              label={t("subscription.board_failed_runs")}
-              value={failedRuns().length}
-              detail={t("subscription.board_failed_runs_hint")}
-              tone="danger"
+              label={t("subscription.board_changed_files")}
+              value={board().changed_count}
               bgColor={mutedBg()}
-              onClick={() =>
-                setStatusFilter((current) =>
-                  current === "failed" ? "all" : "failed",
-                )
-              }
-              active={statusFilter() === "failed"}
             />
             <MetricCard
-              label={t("subscription.board_transferred")}
-              value={runTotals().transferred}
-              detail={`${t("subscription.run_added")}: ${
-                runTotals().added
-              } · ${t("subscription.run_changed")}: ${runTotals().changed}`}
+              label={t("subscription.board_added_files")}
+              value={board().added_count}
               bgColor={mutedBg()}
             />
           </SimpleGrid>
@@ -389,518 +344,484 @@ const TransferTasks = (props: {
             rounded="$md"
             p="$3"
           >
-            <HStack gap="$2" flexWrap="wrap">
-              <Text fontWeight="$semibold" minW="5rem">
-                {t("subscription.board_status_filter")}
-              </Text>
-              <FilterButton
-                active={statusFilter() === "all"}
-                onClick={() => setStatusFilter("all")}
-              >
-                {t("subscription.all")}
-              </FilterButton>
-              <For each={statuses}>
-                {(status) => (
-                  <FilterButton
-                    active={statusFilter() === status}
-                    onClick={() => setStatusFilter(status)}
-                  >
-                    {t(`subscription.statuses.${status}`)}
-                  </FilterButton>
-                )}
-              </For>
-            </HStack>
-            <HStack gap="$2" flexWrap="wrap">
-              <Text fontWeight="$semibold" minW="5rem">
-                {t("subscription.board_source_filter")}
-              </Text>
-              <FilterButton
-                active={sourceFilter() === "all"}
-                onClick={() => setSourceFilter("all")}
-              >
-                {t("subscription.all")}
-              </FilterButton>
-              <For each={sources}>
-                {(source) => (
-                  <FilterButton
-                    active={sourceFilter() === source}
-                    onClick={() => setSourceFilter(source)}
-                  >
-                    {t(`subscription.source_types.${source}`)}
-                  </FilterButton>
-                )}
-              </For>
-              <Input
-                maxW={{ "@initial": "$full", "@md": "18rem" }}
-                placeholder={t("subscription.board_keyword_placeholder")}
-                value={keyword()}
-                onInput={(e: any) => setKeyword(e.currentTarget.value)}
-              />
-            </HStack>
+            <SimpleGrid
+              columns={{ "@initial": 1, "@md": 2, "@xl": 4 }}
+              gap="$3"
+            >
+              <FilterField label={t("subscription.board_subscription_filter")}>
+                <Select
+                  value={selectedSubscriptionID()}
+                  onChange={(value) => setSelectedSubscriptionID(String(value))}
+                >
+                  <SelectTrigger borderRadius="$sm">
+                    <SelectPlaceholder>
+                      {t("subscription.board_subscription_filter")}
+                    </SelectPlaceholder>
+                    <SelectValue />
+                    <SelectIcon />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectListbox>
+                      <SelectOption value="all">
+                        <SelectOptionText>
+                          {t("subscription.all")}
+                        </SelectOptionText>
+                        <SelectOptionIndicator />
+                      </SelectOption>
+                      <For each={subscriptions()}>
+                        {(subscription) => (
+                          <SelectOption value={String(subscription.id)}>
+                            <SelectOptionText>
+                              {subscription.name}
+                            </SelectOptionText>
+                            <SelectOptionIndicator />
+                          </SelectOption>
+                        )}
+                      </For>
+                    </SelectListbox>
+                  </SelectContent>
+                </Select>
+              </FilterField>
+
+              <FilterField label={t("subscription.board_source_filter")}>
+                <Select
+                  value={sourceFilter()}
+                  onChange={(value) => setSourceFilter(value as SourceFilter)}
+                >
+                  <SelectTrigger borderRadius="$sm">
+                    <SelectValue />
+                    <SelectIcon />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectListbox>
+                      <SelectOption value="all">
+                        <SelectOptionText>
+                          {t("subscription.all")}
+                        </SelectOptionText>
+                        <SelectOptionIndicator />
+                      </SelectOption>
+                      <For each={sources}>
+                        {(source) => (
+                          <SelectOption value={source}>
+                            <SelectOptionText>
+                              {t(`subscription.source_types.${source}`)}
+                            </SelectOptionText>
+                            <SelectOptionIndicator />
+                          </SelectOption>
+                        )}
+                      </For>
+                    </SelectListbox>
+                  </SelectContent>
+                </Select>
+              </FilterField>
+
+              <FilterField label={t("subscription.board_status_filter")}>
+                <Select
+                  value={statusFilter()}
+                  onChange={(value) => setStatusFilter(value as StatusFilter)}
+                >
+                  <SelectTrigger borderRadius="$sm">
+                    <SelectValue />
+                    <SelectIcon />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectListbox>
+                      <SelectOption value="all">
+                        <SelectOptionText>
+                          {t("subscription.all")}
+                        </SelectOptionText>
+                        <SelectOptionIndicator />
+                      </SelectOption>
+                      <For each={statuses}>
+                        {(status) => (
+                          <SelectOption value={status}>
+                            <SelectOptionText>
+                              {t(`subscription.statuses.${status}`)}
+                            </SelectOptionText>
+                            <SelectOptionIndicator />
+                          </SelectOption>
+                        )}
+                      </For>
+                    </SelectListbox>
+                  </SelectContent>
+                </Select>
+              </FilterField>
+
+              <FilterField label={t("subscription.filter")}>
+                <Input
+                  borderRadius="$sm"
+                  placeholder={t("subscription.board_keyword_placeholder")}
+                  value={keyword()}
+                  onInput={(event: any) =>
+                    setKeyword(event.currentTarget.value)
+                  }
+                />
+              </FilterField>
+            </SimpleGrid>
           </VStack>
 
-          <Grid
-            gap="$3"
-            templateColumns={{ "@initial": "1fr", "@xl": "1.15fr 0.85fr" }}
-          >
-            <VStack
-              alignItems="stretch"
-              spacing="$3"
-              border="1px solid"
-              borderColor={border()}
-              rounded="$md"
-              p="$3"
-            >
-              <HStack justifyContent="space-between" gap="$2" flexWrap="wrap">
-                <Text fontWeight="$semibold">
-                  {t("subscription.board_status_distribution")}
-                </Text>
-                <Text color="$neutral11" fontSize="$sm">
-                  {t("subscription.board_status_legend")}
-                </Text>
-              </HStack>
-              <For each={statusStats()}>
-                {(item) => (
-                  <StatusBar
-                    label={t(`subscription.statuses.${item.status}`)}
-                    color={statusAccent[item.status]}
-                    subscriptions={item.subscriptions}
-                    runs={item.runs}
-                    total={statusTotal()}
-                    bgColor={chartBg()}
-                    active={statusFilter() === item.status}
-                    onClick={() =>
-                      setStatusFilter((current) =>
-                        current === item.status ? "all" : item.status,
-                      )
-                    }
-                  />
-                )}
-              </For>
-            </VStack>
-            <VStack
-              alignItems="stretch"
-              spacing="$3"
-              border="1px solid"
-              borderColor={border()}
-              rounded="$md"
-              p="$3"
-            >
+          <VStack alignItems="stretch" spacing="$3">
+            <HStack justifyContent="space-between" gap="$2" flexWrap="wrap">
               <Text fontWeight="$semibold">
-                {t("subscription.board_source_distribution")}
+                {t("subscription.board_change_records")}
               </Text>
-              <For each={sourceStats()}>
-                {(item) => (
-                  <StatusBar
-                    label={t(`subscription.source_types.${item.source}`)}
-                    color="$accent9"
-                    subscriptions={item.count}
-                    runs={0}
-                    total={filteredSubscriptions().length || 1}
-                    bgColor={chartBg()}
-                    compact
-                    active={sourceFilter() === item.source}
-                    onClick={() =>
-                      setSourceFilter((current) =>
-                        current === item.source ? "all" : item.source,
-                      )
-                    }
-                  />
-                )}
-              </For>
-            </VStack>
-          </Grid>
+              <Text color="$neutral11" fontSize="$sm">
+                {board().changed_run_count}
+              </Text>
+            </HStack>
 
-          <Show when={failedRuns().length > 0}>
-            <VStack
-              alignItems="stretch"
-              spacing="$2"
-              border="1px solid"
-              borderColor="$danger6"
-              bgColor={failureBg()}
-              rounded="$md"
-              p="$3"
-            >
-              <HStack justifyContent="space-between" gap="$2" flexWrap="wrap">
-                <Text fontWeight="$semibold" color="$danger11">
-                  {t("subscription.board_failure_queue")}
-                </Text>
-                <Button
-                  size="sm"
-                  variant="subtle"
-                  colorScheme="danger"
-                  leftIcon={<AiOutlineDelete />}
-                  loading={clearFailedLoading()}
-                  onClick={clearFailureQueue}
-                >
-                  {t("subscription.board_clear_failure_queue")}
-                </Button>
-              </HStack>
-              <For each={failedRuns()}>
-                {(run) => (
-                  <HStack
-                    justifyContent="space-between"
-                    alignItems="start"
-                    gap="$3"
-                    flexWrap="wrap"
-                  >
-                    <Box minW="12rem">
-                      <Text fontWeight="$medium">
-                        {subscriptionName(run.subscription_id)}
-                      </Text>
-                      <Text color="$neutral11" fontSize="$sm">
-                        {formatDate(run.started_at)}
-                      </Text>
-                    </Box>
-                    <Text
-                      flex="1"
-                      color="$danger11"
-                      fontSize="$sm"
-                      css={{ wordBreak: "break-word" }}
-                    >
-                      {run.error || "-"}
-                    </Text>
-                    <Button
-                      size="sm"
-                      variant="subtle"
-                      colorScheme="danger"
-                      loading={deletingRunID() === run.id}
-                      onClick={() => removeFailedRun(run)}
-                    >
-                      {t("subscription.board_clear_failure")}
-                    </Button>
-                  </HStack>
-                )}
-              </For>
-            </VStack>
-          </Show>
-
-          <Divider />
-
-          <Text fontWeight="$semibold">
-            {t("subscription.board_subscriptions_table")}
-          </Text>
-          <Box w="$full" overflowX="auto">
-            <Table dense highlightOnHover>
-              <Thead>
-                <Tr>
-                  <Th>{t("subscription.name")}</Th>
-                  <Th>{t("subscription.source_type")}</Th>
-                  <Th>{t("subscription.category")}</Th>
-                  <Th>{t("subscription.last_status")}</Th>
-                  <Th>{t("subscription.updated_at")}</Th>
-                  <Th>{t("subscription.source_provider")}</Th>
-                </Tr>
-              </Thead>
-              <Tbody>
-                <Show
-                  when={filteredSubscriptions().length > 0}
-                  fallback={
-                    <Tr>
-                      <Td colSpan={6}>
-                        <Text color="$neutral11" textAlign="center" py="$4">
-                          {t("subscription.board_empty_subscriptions")}
-                        </Text>
-                      </Td>
-                    </Tr>
-                  }
-                >
-                  <For each={filteredSubscriptions()}>
-                    {(record) => (
+            <Box w="$full" overflowX="auto">
+              <Table dense highlightOnHover>
+                <Thead>
+                  <Tr>
+                    <Th>{t("subscription.run_subscription")}</Th>
+                    <Th>{t("subscription.source_type")}</Th>
+                    <Th>{t("subscription.run_counts")}</Th>
+                    <Th>{t("subscription.run_time")}</Th>
+                    <Th>{t("subscription.board_duration")}</Th>
+                  </Tr>
+                </Thead>
+                <Tbody>
+                  <Show
+                    when={changeRuns().length > 0}
+                    fallback={
                       <Tr>
-                        <Td maxW="20rem">
-                          <Text
-                            fontWeight="$medium"
-                            css={{ wordBreak: "break-all" }}
-                          >
-                            {record.name}
+                        <Td colSpan={5}>
+                          <Text color="$neutral11" textAlign="center" py="$4">
+                            {t("subscription.board_empty_runs")}
                           </Text>
-                          <Text color="$neutral11" fontSize="$sm">
-                            #{record.id}
-                          </Text>
-                        </Td>
-                        <Td>
-                          {t(`subscription.source_types.${record.source_type}`)}
-                        </Td>
-                        <Td maxW="20rem">
-                          <Text css={{ wordBreak: "break-word" }}>
-                            {record.category || "-"}
-                          </Text>
-                        </Td>
-                        <Td>
-                          <StatusBadge status={record.last_status || "idle"} />
-                          <Show when={record.last_error}>
-                            <Text
-                              color="$danger11"
-                              fontSize="$sm"
-                              css={{ wordBreak: "break-all" }}
-                            >
-                              {record.last_error}
-                            </Text>
-                          </Show>
-                        </Td>
-                        <Td>{formatDate(record.updated_at)}</Td>
-                        <Td>
-                          <Button
-                            size="sm"
-                            variant="subtle"
-                            loading={
-                              itemsLoading() &&
-                              selectedSubscriptionID() === record.id
-                            }
-                            onClick={() => toggleEpisodeSources(record.id)}
-                          >
-                            {t(
-                              selectedSubscriptionID() === record.id
-                                ? "subscription.board_hide_episode_sources"
-                                : "subscription.board_view_episode_sources",
-                            )}
-                          </Button>
                         </Td>
                       </Tr>
-                    )}
-                  </For>
-                </Show>
-              </Tbody>
-            </Table>
-          </Box>
-
-          <Show when={selectedSubscriptionID()}>
-            {(subscriptionID) => (
-              <VStack
-                alignItems="stretch"
-                spacing="$3"
-                border="1px solid"
-                borderColor={border()}
-                rounded="$md"
-                p="$3"
-              >
-                <HStack justifyContent="space-between" gap="$2" flexWrap="wrap">
-                  <Text fontWeight="$semibold">
-                    {t("subscription.board_episode_sources")} ·{" "}
-                    {subscriptionName(subscriptionID())}
-                  </Text>
-                  <Text color="$neutral11" fontSize="$sm">
-                    {episodeItems()[subscriptionID()]?.length || 0}
-                  </Text>
-                </HStack>
-                <Show
-                  when={(episodeItems()[subscriptionID()] || []).length > 0}
-                  fallback={
-                    <Text color="$neutral11">
-                      {t("subscription.board_empty_episode_sources")}
-                    </Text>
-                  }
-                >
-                  <Box
-                    display="grid"
-                    gap="$2"
-                    gridTemplateColumns={{
-                      "@initial": "1fr",
-                      "@md": "repeat(2, minmax(0, 1fr))",
-                      "@xl": "repeat(3, minmax(0, 1fr))",
-                    }}
+                    }
                   >
-                    <For each={episodeItems()[subscriptionID()] || []}>
-                      {(item) => (
-                        <HStack
-                          justifyContent="space-between"
-                          alignItems="start"
-                          gap="$3"
-                          minW="0"
-                          p="$2"
-                          bgColor={mutedBg()}
-                          rounded="$md"
-                        >
-                          <Box minW="0">
-                            <Text fontWeight="$medium">
-                              {episodeLabel(item)}
-                            </Text>
+                    <For each={changeRuns()}>
+                      {(run) => (
+                        <Tr>
+                          <Td maxW="20rem">
                             <Text
-                              color="$neutral11"
-                              fontSize="$sm"
-                              css={{
-                                overflow: "hidden",
-                                textOverflow: "ellipsis",
-                                whiteSpace: "nowrap",
-                              }}
+                              fontWeight="$medium"
+                              css={{ wordBreak: "break-word" }}
                             >
-                              {item.file_name || item.source_path || "-"}
+                              {run.subscription_name ||
+                                `#${run.subscription_id}`}
                             </Text>
-                          </Box>
-                          <Badge colorScheme="info">
-                            {episodeProviderLabel(item)}
-                          </Badge>
-                        </HStack>
+                          </Td>
+                          <Td>
+                            {run.subscription_source_type ? (
+                              <Badge colorScheme="neutral">
+                                {t(
+                                  `subscription.source_types.${run.subscription_source_type}`,
+                                )}
+                              </Badge>
+                            ) : (
+                              "-"
+                            )}
+                          </Td>
+                          <Td>
+                            {[
+                              `${t("subscription.run_added")}: ${run.added_count}`,
+                              `${t("subscription.run_changed")}: ${run.changed_count}`,
+                              `${t("subscription.run_transferred")}: ${run.transferred_count}`,
+                            ].join(" · ")}
+                          </Td>
+                          <Td>
+                            <Text>{formatDate(run.started_at)}</Text>
+                            <Text color="$neutral11" fontSize="$sm">
+                              {formatDate(run.finished_at)}
+                            </Text>
+                          </Td>
+                          <Td>{durationLabel(run)}</Td>
+                        </Tr>
                       )}
                     </For>
-                  </Box>
-                </Show>
-              </VStack>
-            )}
-          </Show>
-
-          <Text fontWeight="$semibold">
-            {t("subscription.board_runs_table")}
-          </Text>
-          <Box w="$full" overflowX="auto">
-            <Table dense highlightOnHover>
-              <Thead>
-                <Tr>
-                  <Th>{t("subscription.run_subscription")}</Th>
-                  <Th>{t("subscription.last_status")}</Th>
-                  <Th>{t("subscription.run_counts")}</Th>
-                  <Th>{t("subscription.run_time")}</Th>
-                  <Th>{t("subscription.board_duration")}</Th>
-                  <Th>{t("tasks.attr.err")}</Th>
-                </Tr>
-              </Thead>
-              <Tbody>
-                <Show
-                  when={filteredRuns().length > 0}
-                  fallback={
-                    <Tr>
-                      <Td colSpan={6}>
-                        <Text color="$neutral11" textAlign="center" py="$4">
-                          {t("subscription.board_empty_runs")}
-                        </Text>
-                      </Td>
-                    </Tr>
-                  }
-                >
-                  <For each={filteredRuns()}>
-                    {(run) => (
-                      <Tr>
-                        <Td>{subscriptionName(run.subscription_id)}</Td>
-                        <Td>
-                          <StatusBadge status={run.status} />
-                        </Td>
-                        <Td>
-                          {[
-                            `${t("subscription.run_added")}: ${run.added_count}`,
-                            `${t("subscription.run_changed")}: ${run.changed_count}`,
-                            `${t("subscription.run_transferred")}: ${run.transferred_count}`,
-                          ].join(" · ")}
-                        </Td>
-                        <Td>
-                          <Text>{formatDate(run.started_at)}</Text>
-                          <Text color="$neutral11" fontSize="$sm">
-                            {formatDate(run.finished_at)}
-                          </Text>
-                        </Td>
-                        <Td>{durationLabel(run)}</Td>
-                        <Td maxW="24rem">
-                          <Text
-                            color="$danger11"
-                            css={{ wordBreak: "break-all" }}
-                          >
-                            {run.error || "-"}
-                          </Text>
-                        </Td>
-                      </Tr>
-                    )}
-                  </For>
-                </Show>
-              </Tbody>
-            </Table>
-          </Box>
+                  </Show>
+                </Tbody>
+              </Table>
+            </Box>
+          </VStack>
         </VStack>
       </Box>
+
+      <Show when={board().failure_count > 0}>
+        <FailurePill
+          count={board().failure_count}
+          isMobile={isMobile()}
+          drawerOpen={failureDrawer.isOpen()}
+          onOpenDrawer={failureDrawer.onOpen}
+          onCloseDrawer={failureDrawer.onClose}
+          clearLoading={!!clearFailedLoading()}
+          deletingRunID={deletingRunID()}
+          failures={failureRuns()}
+          failureBg={failureBg()}
+          borderColor={border()}
+          formatDate={formatDate}
+          onDeleteFailure={deleteFailure}
+          onClearFailures={clearFailures}
+        />
+      </Show>
     </VStack>
   )
 }
 
+const FilterField = (props: { label: string; children: any }) => (
+  <VStack alignItems="stretch" spacing="$1">
+    <Text color="$neutral11" fontSize="$sm">
+      {props.label}
+    </Text>
+    {props.children}
+  </VStack>
+)
+
 const MetricCard = (props: {
   label: string
   value: number
-  detail: string
   bgColor: string
-  tone?: "danger"
-  onClick?: () => void
-  active?: boolean
 }) => (
-  <Box
-    as={props.onClick ? "button" : undefined}
-    type={props.onClick ? "button" : undefined}
-    bgColor={props.bgColor}
-    rounded="$md"
-    p="$3"
-    onClick={props.onClick}
-    border={props.active ? "2px solid" : "1px solid transparent"}
-    borderColor={props.active ? "$accent8" : "transparent"}
-    css={
-      props.onClick
-        ? {
-            cursor: "pointer",
-            textAlign: "left",
-            width: "100%",
-          }
-        : undefined
-    }
-  >
+  <Box bgColor={props.bgColor} rounded="$md" p="$3">
     <Text color="$neutral11" fontSize="$sm">
       {props.label}
     </Text>
     <Text
       fontSize="$3xl"
       fontWeight="$semibold"
-      color={props.tone === "danger" ? "$danger11" : undefined}
       css={{ fontVariantNumeric: "tabular-nums" }}
     >
       {props.value}
     </Text>
-    <Text color="$neutral11" fontSize="$sm">
-      {props.detail}
-    </Text>
   </Box>
 )
 
-const StatusBar = (props: {
-  label: string
-  color: string
-  subscriptions: number
-  runs: number
-  total: number
-  bgColor: string
-  compact?: boolean
-  active?: boolean
-  onClick?: () => void
+const FailurePill = (props: {
+  count: number
+  isMobile: boolean
+  drawerOpen: boolean
+  onOpenDrawer: () => void
+  onCloseDrawer: () => void
+  clearLoading: boolean
+  deletingRunID: number | undefined
+  failures: SubscriptionRun[]
+  failureBg: string
+  borderColor: string
+  formatDate: (value?: string) => string
+  onDeleteFailure: (runID: number, onClose?: () => void) => Promise<void>
+  onClearFailures: (onClose?: () => void) => Promise<void>
 }) => {
-  const count = () => props.subscriptions + props.runs
-  const width = () =>
-    `${Math.max(4, Math.round((count() / props.total) * 100))}%`
-  return (
-    <Box
-      as={props.onClick ? "button" : undefined}
-      type={props.onClick ? "button" : undefined}
-      onClick={props.onClick}
-      w="$full"
-      textAlign="left"
-      rounded="$sm"
-      p="$1"
-      border={props.active ? "1px solid" : "1px solid transparent"}
-      borderColor={props.active ? "$accent8" : "transparent"}
-      bgColor={props.active ? "$accent3" : "transparent"}
-      css={props.onClick ? { cursor: "pointer" } : undefined}
-    >
-      <HStack justifyContent="space-between" mb="$1" gap="$2">
-        <Text fontSize="$sm" fontWeight="$medium">
-          {props.label}
-        </Text>
-        <Text
-          color="$neutral11"
-          fontSize="$sm"
-          css={{ fontVariantNumeric: "tabular-nums" }}
+  const t = useT()
+  if (props.isMobile) {
+    return (
+      <>
+        <Button
+          size="sm"
+          colorScheme="danger"
+          leftIcon={<AiOutlineWarning />}
+          pos="fixed"
+          right="$4"
+          bottom="$4"
+          zIndex="$docked"
+          rounded="$full"
+          aria-label={t("subscription.board_open_failures_aria", {
+            count: props.count,
+          })}
+          onClick={props.onOpenDrawer}
         >
-          <Show when={!props.compact} fallback={`${props.subscriptions}`}>
-            {`${props.subscriptions} / ${props.runs}`}
-          </Show>
-        </Text>
+          {props.count}
+        </Button>
+        <Drawer
+          opened={props.drawerOpen}
+          placement="bottom"
+          onClose={props.onCloseDrawer}
+        >
+          <DrawerOverlay />
+          <DrawerContent maxH="75vh">
+            <DrawerCloseButton />
+            <DrawerHeader>{t("subscription.board_failure_queue")}</DrawerHeader>
+            <DrawerBody pb="$6">
+              <FailureList
+                count={props.count}
+                clearLoading={props.clearLoading}
+                deletingRunID={props.deletingRunID}
+                failures={props.failures}
+                failureBg={props.failureBg}
+                borderColor={props.borderColor}
+                formatDate={props.formatDate}
+                onDeleteFailure={(runID) => props.onDeleteFailure(runID)}
+                onClearFailures={() =>
+                  props.onClearFailures(props.onCloseDrawer)
+                }
+              />
+            </DrawerBody>
+          </DrawerContent>
+        </Drawer>
+      </>
+    )
+  }
+
+  return (
+    <Popover placement="top-end">
+      {({ onClose }) => (
+        <>
+          <PopoverTrigger
+            as={Button}
+            size="sm"
+            colorScheme="danger"
+            leftIcon={<AiOutlineWarning />}
+            pos="fixed"
+            right="$6"
+            bottom="$6"
+            zIndex="$docked"
+            rounded="$full"
+            aria-label={t("subscription.board_open_failures_aria", {
+              count: props.count,
+            })}
+          >
+            {props.count}
+          </PopoverTrigger>
+          <PopoverContent
+            w="min(24rem, calc(100vw - 2rem))"
+            maxH="24rem"
+            overflow="hidden"
+          >
+            <PopoverArrow />
+            <PopoverBody p="$0">
+              <FailureList
+                count={props.count}
+                clearLoading={props.clearLoading}
+                deletingRunID={props.deletingRunID}
+                failures={props.failures}
+                failureBg={props.failureBg}
+                borderColor={props.borderColor}
+                formatDate={props.formatDate}
+                onDeleteFailure={(runID) => props.onDeleteFailure(runID)}
+                onClearFailures={() => props.onClearFailures(onClose)}
+              />
+            </PopoverBody>
+          </PopoverContent>
+        </>
+      )}
+    </Popover>
+  )
+}
+
+const FailureList = (props: {
+  count: number
+  clearLoading: boolean
+  deletingRunID: number | undefined
+  failures: SubscriptionRun[]
+  failureBg: string
+  borderColor: string
+  formatDate: (value?: string) => string
+  onDeleteFailure: (runID: number) => Promise<void>
+  onClearFailures: () => Promise<void>
+}) => {
+  const t = useT()
+
+  return (
+    <VStack alignItems="stretch" spacing="$0" bgColor={props.failureBg}>
+      <HStack
+        justifyContent="space-between"
+        alignItems="start"
+        gap="$3"
+        p="$3"
+        borderBottom="1px solid"
+        borderColor={props.borderColor}
+      >
+        <Box>
+          <Text fontWeight="$semibold">
+            {t("subscription.board_failure_queue")}
+          </Text>
+          <Text color="$neutral11" fontSize="$sm">
+            {t("subscription.board_failure_count", { count: props.count })}
+          </Text>
+        </Box>
+        <Button
+          size="sm"
+          variant="subtle"
+          colorScheme="danger"
+          leftIcon={<AiOutlineDelete />}
+          loading={props.clearLoading}
+          onClick={() => void props.onClearFailures()}
+        >
+          {t("subscription.board_clear_failures")}
+        </Button>
       </HStack>
-      <Box h="$2" bgColor={props.bgColor} rounded="$full" overflow="hidden">
-        <Box h="$full" w={width()} bgColor={props.color} rounded="$full" />
-      </Box>
-    </Box>
+
+      <Show
+        when={props.failures.length > 0}
+        fallback={
+          <Text color="$neutral11" fontSize="$sm" p="$3">
+            {t("subscription.board_empty_failures")}
+          </Text>
+        }
+      >
+        <VStack alignItems="stretch" spacing="$0" maxH="20rem" overflowY="auto">
+          <For each={props.failures}>
+            {(run, index) => (
+              <VStack
+                alignItems="stretch"
+                spacing="$2"
+                p="$3"
+                bgColor={props.failureBg}
+                borderTop={index() > 0 ? "1px solid" : undefined}
+                borderColor={index() > 0 ? props.borderColor : undefined}
+              >
+                <HStack
+                  justifyContent="space-between"
+                  alignItems="start"
+                  gap="$3"
+                >
+                  <Box minW="0">
+                    <Text
+                      fontWeight="$medium"
+                      css={{ wordBreak: "break-word" }}
+                    >
+                      {run.subscription_name || `#${run.subscription_id}`}
+                    </Text>
+                    <Text color="$neutral11" fontSize="$sm">
+                      {props.formatDate(run.started_at)}
+                    </Text>
+                  </Box>
+                  <Button
+                    size="xs"
+                    variant="subtle"
+                    colorScheme="danger"
+                    loading={props.deletingRunID === run.id}
+                    onClick={() => void props.onDeleteFailure(run.id)}
+                  >
+                    {t("subscription.board_clear_failure")}
+                  </Button>
+                </HStack>
+                <HStack gap="$2" flexWrap="wrap">
+                  <StatusBadge status={run.status} />
+                  {run.subscription_source_type ? (
+                    <Badge colorScheme="neutral">
+                      {t(
+                        `subscription.source_types.${run.subscription_source_type}`,
+                      )}
+                    </Badge>
+                  ) : null}
+                </HStack>
+                <Text
+                  color="$danger11"
+                  fontSize="$sm"
+                  css={{ wordBreak: "break-word" }}
+                >
+                  {run.error || "-"}
+                </Text>
+              </VStack>
+            )}
+          </For>
+        </VStack>
+      </Show>
+    </VStack>
+  )
+}
+
+const StatusBadge = (props: { status: SubscriptionStatus }) => {
+  const t = useT()
+  return (
+    <Badge colorScheme={statusColor[props.status]}>
+      {t(`subscription.statuses.${props.status}`)}
+    </Badge>
   )
 }
 

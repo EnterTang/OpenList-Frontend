@@ -12,7 +12,7 @@ import {
 import { Accessor, For, Setter, Show, createSignal } from "solid-js"
 import { CgFolderAdd, CgMoreO, CgShare } from "solid-icons/cg"
 import { AiOutlineSetting } from "solid-icons/ai"
-import { BsArrowLeftRight, BsSearch } from "solid-icons/bs"
+import { BsHddNetwork, BsSearch } from "solid-icons/bs"
 import { useT } from "~/hooks"
 
 export type HomePageKey =
@@ -20,14 +20,14 @@ export type HomePageKey =
   | "subscriptions"
   | "mobile_share"
   | "resource_search"
-  | "task_board"
+  | "cluster_control"
 
 const pageItems = [
   { key: "netdisk", icon: CgFolderAdd },
   { key: "subscriptions", icon: AiOutlineSetting },
   { key: "mobile_share", icon: CgShare },
   { key: "resource_search", icon: BsSearch },
-  { key: "task_board", icon: BsArrowLeftRight },
+  { key: "cluster_control", icon: BsHddNetwork },
 ] as const
 
 export const HomeAppSidebar = (props: {
@@ -95,6 +95,8 @@ export const HomeAppSidebar = (props: {
               return (
                 <Tooltip label={collapsed() ? label() : ""}>
                   <Button
+                    aria-label={label()}
+                    aria-current={active() ? "page" : undefined}
                     variant={active() ? "solid" : "subtle"}
                     colorScheme={active() ? "accent" : "neutral"}
                     justifyContent={collapsed() ? "center" : "flex-start"}

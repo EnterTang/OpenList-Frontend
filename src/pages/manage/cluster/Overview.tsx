@@ -48,9 +48,13 @@ import {
 
 const pollInterval = 10000
 
-const Overview = () => {
-  const t = useT()
+const ClusterPageTitle = () => {
   useManageTitle("cluster.overview.title")
+  return null
+}
+
+const Overview = (props: { embedded?: boolean } = {}) => {
+  const t = useT()
   const [nodes, setNodes] = createSignal<ClusterNode[]>([])
   const [jobs, setJobs] = createSignal<ClusterJob[]>([])
   const [results, setResults] = createSignal<ClusterUploadManifest[]>([])
@@ -97,10 +101,13 @@ const Overview = () => {
 
   return (
     <VStack w="$full" alignItems="stretch" spacing="$4" pb="$6">
-      <PageHeader
-        titleKey="cluster.overview.title"
-        descriptionKey="cluster.overview.description"
-      />
+      <Show when={!props.embedded}>
+        <ClusterPageTitle />
+        <PageHeader
+          titleKey="cluster.overview.title"
+          descriptionKey="cluster.overview.description"
+        />
+      </Show>
 
       <SimpleGrid columns={{ "@initial": 2, "@lg": 4 }} gap="$3">
         <Metric

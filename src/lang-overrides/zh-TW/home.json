@@ -6,7 +6,16 @@
     "subscriptions": "訂閱管理",
     "mobile_share": "移動分享管理",
     "resource_search": "訂閱源搜尋",
-    "task_board": "任務看板"
+    "task_board": "任務看板",
+    "cluster_control": "叢集控制"
+  },
+  "cluster_control": {
+    "tabs": {
+      "overview": "總覽",
+      "nodes": "Worker 節點",
+      "tasks": "任務看板",
+      "settings": "叢集設定"
+    }
   },
   "toolbar": {
     "mobile_share": "建立移動分享連結",

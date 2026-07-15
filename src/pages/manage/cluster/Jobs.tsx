@@ -87,9 +87,13 @@ const statuses: ClusterJobStatus[] = [
   "dead_letter",
 ]
 
-const Jobs = () => {
-  const t = useT()
+const ClusterPageTitle = () => {
   useManageTitle("cluster.jobs.title")
+  return null
+}
+
+const Jobs = (props: { embedded?: boolean } = {}) => {
+  const t = useT()
   const details = createDisclosure()
   const [jobs, setJobs] = createSignal<ClusterJob[]>([])
   const [results, setResults] = createSignal<ClusterUploadManifest[]>([])
@@ -218,32 +222,35 @@ const Jobs = () => {
 
   return (
     <VStack w="$full" alignItems="stretch" spacing="$4" pb="$6">
-      <PageHeader
-        titleKey="cluster.jobs.title"
-        descriptionKey="cluster.jobs.description"
-        actions={
-          <HStack spacing="$2" flexWrap="wrap">
-            <Button
-              leftIcon={<AiOutlineReload />}
-              variant="outline"
-              loading={loading()}
-              onClick={refresh}
-            >
-              {t("cluster.actions.refresh")}
-            </Button>
-            <Button
-              leftIcon={<AiOutlineDelete />}
-              colorScheme="danger"
-              variant="outline"
-              loading={clearing()}
-              disabled={failureCount() === 0}
-              onClick={archiveFailed}
-            >
-              {t("cluster.actions.clear_failed")}
-            </Button>
-          </HStack>
-        }
-      />
+      <Show when={!props.embedded}>
+        <ClusterPageTitle />
+        <PageHeader
+          titleKey="cluster.jobs.title"
+          descriptionKey="cluster.jobs.description"
+          actions={
+            <HStack spacing="$2" flexWrap="wrap">
+              <Button
+                leftIcon={<AiOutlineReload />}
+                variant="outline"
+                loading={loading()}
+                onClick={refresh}
+              >
+                {t("cluster.actions.refresh")}
+              </Button>
+              <Button
+                leftIcon={<AiOutlineDelete />}
+                colorScheme="danger"
+                variant="outline"
+                loading={clearing()}
+                disabled={failureCount() === 0}
+                onClick={archiveFailed}
+              >
+                {t("cluster.actions.clear_failed")}
+              </Button>
+            </HStack>
+          }
+        />
+      </Show>
 
       <SimpleGrid columns={{ "@initial": 2, "@lg": 4 }} gap="$3">
         <Metric

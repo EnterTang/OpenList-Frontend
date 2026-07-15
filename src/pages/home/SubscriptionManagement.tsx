@@ -8,6 +8,12 @@ import {
   HStack,
   Image,
   Input,
+  Modal,
+  ModalBody,
+  ModalCloseButton,
+  ModalContent,
+  ModalHeader,
+  ModalOverlay,
   Select,
   SelectContent,
   SelectIcon,
@@ -19,8 +25,14 @@ import {
   SelectTrigger,
   SelectValue,
   Switch as HopeSwitch,
+  Table,
+  Tbody,
+  Td,
   Text,
+  Th,
+  Thead,
   Textarea,
+  Tr,
   VStack,
   useColorModeValue,
 } from "@hope-ui/solid"
@@ -38,6 +50,7 @@ import {
 } from "solid-icons/ai"
 import {
   JSXElement,
+  createMemo,
   createSignal,
   For,
   Match,
@@ -49,7 +62,9 @@ import { Paginator } from "~/components"
 import { useFetch, useT } from "~/hooks"
 import {
   Subscription,
+  SubscriptionArchiveStatus,
   SubscriptionConfig,
+  SubscriptionEpisodeSource,
   ETFArchiveTMDBCandidate,
   SubscriptionMediaType,
   SubscriptionSourceType,
@@ -59,6 +74,7 @@ import {
 } from "~/types"
 import {
   etfArchiveTMDBSearch,
+  formatDate,
   handleResp,
   notify,
   subscriptionCheck,
@@ -66,6 +82,7 @@ import {
   subscriptionConfigSave,
   subscriptionCreate,
   subscriptionDelete,
+  subscriptionEpisodeSources,
   subscriptionList,
   subscriptionTelegramLogout,
   subscriptionTelegramSendCode,
@@ -78,6 +95,7 @@ import { Container } from "./Container"
 type SubscriptionTab = "list" | "add" | "config"
 type ActiveFilter = "all" | "true" | "false"
 type SourceFilter = "all" | SubscriptionSourceType
+type ArchiveFilter = "all" | SubscriptionArchiveStatus
 
 const pageSize = 30
 
@@ -89,6 +107,11 @@ const tabItems: { key: SubscriptionTab; icon: typeof AiOutlineReload }[] = [
 
 const sourceTypes: SubscriptionSourceType[] = ["manual", "telegram", "pansou"]
 const mediaTypes: SubscriptionMediaType[] = ["tv", "movie"]
+const archiveStatuses: SubscriptionArchiveStatus[] = [
+  "ongoing",
+  "completed",
+  "stalled",
+]
 const deliveryProviders = ["yidong139"] as const
 type TelegramPanKey = "quark" | "aliyun_drive" | "pan123" | "pan115"
 type TelegramPanConfig = SubscriptionConfig["telegram"]["quark"]
@@ -111,9 +134,73 @@ const sourceColor: Record<
 
 const statusColor: Record<string, "neutral" | "info" | "success" | "danger"> = {
   idle: "neutral",
+  pending: "neutral",
   running: "info",
+  transferring: "info",
   success: "success",
+  transferred: "success",
+  skipped: "neutral",
   failed: "danger",
+}
+
+const archiveStatusColor: Record<
+  SubscriptionArchiveStatus,
+  "info" | "success" | "warning"
+> = {
+  ongoing: "info",
+  completed: "success",
+  stalled: "warning",
+}
+
+const subscriptionCheckKey = (id: number, transfer: boolean) =>
+  `${id}:${transfer ? "transfer" : "check"}`
+
+const shortSourceTypeLabel = (
+  sourceType: SubscriptionSourceType,
+  manualLabel: string,
+) => {
+  switch (sourceType) {
+    case "telegram":
+      return "TG"
+    case "pansou":
+      return "PS"
+    default:
+      return manualLabel
+  }
+}
+
+const shortProviderLabel = (provider?: string) => {
+  switch (provider?.trim().toLowerCase()) {
+    case "pan123":
+      return "123"
+    case "pan115":
+      return "115"
+    case "quark":
+      return "Quark"
+    case "aliyun_drive":
+      return "Ali"
+    default:
+      return "-"
+  }
+}
+
+const safeShareURL = (value?: string) => {
+  if (!value) return undefined
+  try {
+    const url = new URL(value)
+    return url.protocol === "http:" || url.protocol === "https:"
+      ? url.toString()
+      : undefined
+  } catch {
+    return undefined
+  }
+}
+
+const formatTimestampLabel = (value?: string) => {
+  if (!value) return "-"
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return formatDate(value)
 }
 
 const emptyStorageTarget = (
@@ -259,6 +346,29 @@ const seasonNumbersFromCandidate = (candidate: ETFArchiveTMDBCandidate) => {
     .sort((a, b) => a - b)
 }
 
+const episodeCountForSeason = (
+  candidate: ETFArchiveTMDBCandidate,
+  season: number,
+) => {
+  const fromMap = Number(candidate.season_map?.[season])
+  if (Number.isFinite(fromMap) && fromMap > 0) return fromMap
+  const fromSeasons = candidate.seasons?.find(
+    (item) => Number(item.season_number) === season,
+  )?.episode_count
+  const parsed = Number(fromSeasons)
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined
+}
+
+const latestSeasonEpisodeCount = (
+  candidate: ETFArchiveTMDBCandidate,
+  seasons: number[],
+) => {
+  const latestSeason = seasons.at(-1)
+  return latestSeason
+    ? episodeCountForSeason(candidate, latestSeason)
+    : undefined
+}
+
 const telegramUserLabel = (status?: SubscriptionTelegramAuthResp) => {
   const user = status?.user
   if (!status?.authorized || !user) return ""
@@ -373,6 +483,8 @@ export const SubscriptionManagement = () => {
   const [keyword, setKeyword] = createSignal("")
   const [active, setActive] = createSignal<ActiveFilter>("all")
   const [sourceType, setSourceType] = createSignal<SourceFilter>("all")
+  const [archiveStatus, setArchiveStatus] =
+    createSignal<ArchiveFilter>("ongoing")
   const [page, setPage] = createSignal(1)
   const [total, setTotal] = createSignal(0)
   const [records, setRecords] = createSignal<Subscription[]>([])
@@ -403,6 +515,16 @@ export const SubscriptionManagement = () => {
   const [telegramPhone, setTelegramPhone] = createSignal("")
   const [telegramCode, setTelegramCode] = createSignal("")
   const [telegramPhoneCodeHash, setTelegramPhoneCodeHash] = createSignal("")
+  const [detailOpened, setDetailOpened] = createSignal(false)
+  const [detailSubscription, setDetailSubscription] =
+    createSignal<Subscription>()
+  const [episodeSourceRecords, setEpisodeSourceRecords] = createSignal<
+    SubscriptionEpisodeSource[]
+  >([])
+  const [episodeSourcesError, setEpisodeSourcesError] = createSignal("")
+  const [episodeSourcesLoadingID, setEpisodeSourcesLoadingID] =
+    createSignal<number>()
+  let episodeSourceRequestID = 0
   let resetPaginator: (() => void) | undefined
 
   const [listLoading, listSubs] = useFetch(() =>
@@ -410,6 +532,7 @@ export const SubscriptionManagement = () => {
       keyword: keyword().trim() || undefined,
       source_type: sourceType() === "all" ? undefined : sourceType(),
       active: active() === "all" ? undefined : active(),
+      archive_status: archiveStatus() === "all" ? "all" : archiveStatus(),
       page: page(),
       per_page: pageSize,
     }),
@@ -417,7 +540,7 @@ export const SubscriptionManagement = () => {
   const [createLoading, createSub] = useFetch(subscriptionCreate)
   const [updateLoading, updateSub] = useFetch(subscriptionUpdate)
   const [deleteLoading, deleteSub] = useFetch(subscriptionDelete)
-  const [checkLoading, checkSub] = useFetch(subscriptionCheck)
+  const [checkingKeys, setCheckingKeys] = createSignal<string[]>([])
   const [tmdbSearchLoading, searchTMDB] = useFetch(etfArchiveTMDBSearch)
   const [configLoading, loadConfig] = useFetch(subscriptionConfigGet)
   const [saveConfigLoading, saveConfig] = useFetch(subscriptionConfigSave)
@@ -433,7 +556,6 @@ export const SubscriptionManagement = () => {
   const [telegramLogoutLoading, logoutTelegramReq] = useFetch(
     subscriptionTelegramLogout,
   )
-
   const refresh = async () => {
     const resp = await listSubs()
     handleResp(resp, (data) => {
@@ -473,6 +595,7 @@ export const SubscriptionManagement = () => {
       candidate.media_type === "movie" ? "movie" : "tv"
     const seasons =
       mediaType === "tv" ? seasonNumbersFromCandidate(candidate) : []
+    const latestSeasonEpisodeEnd = latestSeasonEpisodeCount(candidate, seasons)
     setSelectedTMDBCandidate(candidate)
     setTMDBQuery(candidate.name)
     setTMDBCandidates([])
@@ -487,6 +610,10 @@ export const SubscriptionManagement = () => {
       category: candidate.category || prev.category || "",
       season: mediaType === "tv" ? seasons[0] || prev.season || 1 : 0,
       seasons: mediaType === "tv" ? seasons : [],
+      latest_season_episode_start:
+        mediaType === "tv" ? prev.latest_season_episode_start || 1 : 0,
+      latest_season_episode_end:
+        mediaType === "tv" ? latestSeasonEpisodeEnd || 0 : 0,
     }))
   }
 
@@ -566,10 +693,15 @@ export const SubscriptionManagement = () => {
     const seasons = Array.from(next)
       .filter((item) => item > 0)
       .sort((a, b) => a - b)
+    const latestSeasonEpisodeEnd = selectedTMDBCandidate()
+      ? latestSeasonEpisodeCount(selectedTMDBCandidate()!, seasons)
+      : undefined
     setForm((prev) => ({
       ...prev,
       seasons,
       season: seasons[0] || prev.season || 1,
+      latest_season_episode_end:
+        latestSeasonEpisodeEnd ?? prev.latest_season_episode_end,
     }))
   }
 
@@ -647,11 +779,18 @@ export const SubscriptionManagement = () => {
   }
 
   const runCheck = async (id: number, transfer: boolean) => {
-    const resp = await checkSub(id, transfer)
-    handleResp(resp, () => {
-      notify.success(t("subscription.check_finished"))
-      refresh()
-    })
+    const key = subscriptionCheckKey(id, transfer)
+    if (checkingKeys().includes(key)) return
+    setCheckingKeys((keys) => [...keys, key])
+    try {
+      const resp = await subscriptionCheck(id, transfer)
+      handleResp(resp, () => {
+        notify.success(t("subscription.check_finished"))
+        refresh()
+      })
+    } finally {
+      setCheckingKeys((keys) => keys.filter((value) => value !== key))
+    }
   }
 
   const removeSubscription = async (record: Subscription) => {
@@ -661,6 +800,48 @@ export const SubscriptionManagement = () => {
       notify.success(t("global.delete_success"))
       refresh()
     })
+  }
+
+  const closeSubscriptionDetails = () => {
+    episodeSourceRequestID += 1
+    setDetailOpened(false)
+    setDetailSubscription(undefined)
+    setEpisodeSourceRecords([])
+    setEpisodeSourcesError("")
+    setEpisodeSourcesLoadingID(undefined)
+  }
+
+  const openSubscriptionDetails = async (record: Subscription) => {
+    episodeSourceRequestID += 1
+    const requestID = episodeSourceRequestID
+    setDetailSubscription(record)
+    setEpisodeSourceRecords([])
+    setEpisodeSourcesError("")
+    setEpisodeSourcesLoadingID(record.id)
+    setDetailOpened(true)
+    try {
+      const resp = await subscriptionEpisodeSources(record.id)
+      if (
+        requestID !== episodeSourceRequestID ||
+        detailSubscription()?.id !== record.id
+      ) {
+        return
+      }
+      handleResp(
+        resp,
+        (data) => {
+          setEpisodeSourceRecords(data.content || [])
+        },
+        (message) => {
+          setEpisodeSourcesError(message)
+        },
+      )
+      if (resp.code === 401) setEpisodeSourcesError(resp.message)
+    } finally {
+      if (requestID === episodeSourceRequestID) {
+        setEpisodeSourcesLoadingID(undefined)
+      }
+    }
   }
 
   const updateTelegramConfig = <K extends keyof SubscriptionConfig["telegram"]>(
@@ -842,15 +1023,17 @@ export const SubscriptionManagement = () => {
                 <SubscriptionList
                   active={active()}
                   sourceType={sourceType()}
+                  archiveStatus={archiveStatus()}
                   keyword={keyword()}
                   records={records()}
                   total={total()}
                   listLoading={listLoading()}
-                  checkLoading={checkLoading()}
+                  checkingKeys={checkingKeys()}
                   deleteLoading={deleteLoading()}
                   setKeyword={setKeyword}
                   setActive={setActive}
                   setSourceType={setSourceType}
+                  setArchiveStatus={setArchiveStatus}
                   setPage={setPage}
                   setResetPaginator={(callback) => {
                     resetPaginator = callback
@@ -860,6 +1043,8 @@ export const SubscriptionManagement = () => {
                   runCheck={runCheck}
                   removeSubscription={removeSubscription}
                   editSubscription={editSubscription}
+                  openSubscriptionDetails={openSubscriptionDetails}
+                  episodeSourcesLoadingID={episodeSourcesLoadingID()}
                 />
               </Match>
 
@@ -1116,6 +1301,7 @@ export const SubscriptionManagement = () => {
                                 <Input
                                   type="number"
                                   min="0"
+                                  readOnly={Boolean(selectedTMDBCandidate())}
                                   placeholder={t(
                                     "subscription.episode_range_end",
                                   )}
@@ -1471,6 +1657,15 @@ export const SubscriptionManagement = () => {
                 </VStack>
               </Match>
             </Switch>
+
+            <SubscriptionEpisodeSourcesModal
+              opened={detailOpened()}
+              record={detailSubscription()}
+              loading={episodeSourcesLoadingID() === detailSubscription()?.id}
+              sources={episodeSourceRecords()}
+              error={episodeSourcesError()}
+              onClose={closeSubscriptionDetails}
+            />
           </VStack>
         </Box>
       </VStack>
@@ -1481,15 +1676,17 @@ export const SubscriptionManagement = () => {
 const SubscriptionList = (props: {
   active: ActiveFilter
   sourceType: SourceFilter
+  archiveStatus: ArchiveFilter
   keyword: string
   records: Subscription[]
   total: number
   listLoading: boolean | undefined
-  checkLoading: boolean | undefined
+  checkingKeys: string[]
   deleteLoading: boolean | undefined
   setKeyword: (value: string) => void
   setActive: (value: ActiveFilter) => void
   setSourceType: (value: SourceFilter) => void
+  setArchiveStatus: (value: ArchiveFilter) => void
   setPage: (value: number) => void
   setResetPaginator: (callback: () => void) => void
   applyFilters: () => void
@@ -1497,6 +1694,8 @@ const SubscriptionList = (props: {
   runCheck: (id: number, transfer: boolean) => void
   editSubscription: (record: Subscription) => void
   removeSubscription: (record: Subscription) => void
+  openSubscriptionDetails: (record: Subscription) => void
+  episodeSourcesLoadingID?: number
 }) => {
   const t = useT()
   return (
@@ -1567,6 +1766,36 @@ const SubscriptionList = (props: {
             </SelectListbox>
           </SelectContent>
         </Select>
+        <Select
+          value={props.archiveStatus}
+          onChange={(value) => props.setArchiveStatus(value as ArchiveFilter)}
+        >
+          <SelectTrigger w={{ "@initial": "$full", "@md": "10rem" }}>
+            <SelectPlaceholder>
+              {t("subscription.archive_status")}
+            </SelectPlaceholder>
+            <SelectValue />
+            <SelectIcon />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectListbox>
+              <SelectOption value="all">
+                <SelectOptionText>{t("subscription.all")}</SelectOptionText>
+                <SelectOptionIndicator />
+              </SelectOption>
+              <For each={archiveStatuses}>
+                {(status) => (
+                  <SelectOption value={status}>
+                    <SelectOptionText>
+                      {t(`subscription.archive_statuses.${status}`)}
+                    </SelectOptionText>
+                    <SelectOptionIndicator />
+                  </SelectOption>
+                )}
+              </For>
+            </SelectListbox>
+          </SelectContent>
+        </Select>
         <Button
           colorScheme="accent"
           leftIcon={<AiOutlineReload />}
@@ -1604,8 +1833,20 @@ const SubscriptionList = (props: {
               const latestSeason = seasons().at(-1) || record.season
               const start = record.latest_season_episode_start || 0
               const end = record.latest_season_episode_end || 0
-              const range = start || end ? `E${start || 1}–E${end || "∞"}` : "∞"
+              const range =
+                end > 0
+                  ? `E${start || 1}–E${end}`
+                  : `E${start || 1}–${t("subscription.episode_range_pending")}`
               return `S${String(latestSeason).padStart(2, "0")} · ${range}`
+            }
+            const progress = () => record.progress
+            const missingEpisodeLabel = () => {
+              const missing = progress()?.missing_episodes || []
+              const visible = missing
+                .slice(0, 6)
+                .map((episode) => `E${episode}`)
+              const suffix = missing.length > visible.length ? " …" : ""
+              return `${t("subscription.missing_episodes")}: ${visible.join(", ")}${suffix}`
             }
             return (
               <VStack
@@ -1653,6 +1894,19 @@ const SubscriptionList = (props: {
                     <Badge colorScheme={record.active ? "success" : "neutral"}>
                       {t(record.active ? "global.enable" : "global.disable")}
                     </Badge>
+                    <Show when={progress()}>
+                      {(value) => (
+                        <Badge
+                          colorScheme={
+                            archiveStatusColor[value().archive_status]
+                          }
+                        >
+                          {t(
+                            `subscription.archive_statuses.${value().archive_status}`,
+                          )}
+                        </Badge>
+                      )}
+                    </Show>
                   </VStack>
                 </HStack>
 
@@ -1691,6 +1945,25 @@ const SubscriptionList = (props: {
                           : "subscription.transfer_off",
                       )}
                     </Text>
+                    <Show when={progress()}>
+                      {(value) => (
+                        <>
+                          <Text color="$neutral11" fontSize="$sm">
+                            {value().latest_episode
+                              ? `${t("subscription.updated_to")} E${value().latest_episode}`
+                              : t("subscription.no_episode_update")}
+                            {value().expected_episodes
+                              ? ` · ${t("subscription.stored_progress")}: ${value().completed_episodes}/${value().expected_episodes}`
+                              : ""}
+                          </Text>
+                          <Show when={value().missing_episodes.length > 0}>
+                            <Text color="$warning11" fontSize="$sm">
+                              {missingEpisodeLabel()}
+                            </Text>
+                          </Show>
+                        </>
+                      )}
+                    </Show>
                   </Box>
                 </Box>
 
@@ -1716,8 +1989,19 @@ const SubscriptionList = (props: {
                   <HStack spacing="$2" gap="$2" flexWrap="wrap">
                     <Button
                       size="sm"
+                      variant="subtle"
+                      leftIcon={<AiOutlineSearch />}
+                      loading={props.episodeSourcesLoadingID === record.id}
+                      onClick={() => props.openSubscriptionDetails(record)}
+                    >
+                      {t("subscription.detail_open")}
+                    </Button>
+                    <Button
+                      size="sm"
                       leftIcon={<AiOutlinePlayCircle />}
-                      loading={props.checkLoading}
+                      loading={props.checkingKeys.includes(
+                        subscriptionCheckKey(record.id, false),
+                      )}
                       onClick={() => props.runCheck(record.id, false)}
                     >
                       {t("subscription.check")}
@@ -1725,7 +2009,9 @@ const SubscriptionList = (props: {
                     <Button
                       size="sm"
                       leftIcon={<AiOutlinePlayCircle />}
-                      loading={props.checkLoading}
+                      loading={props.checkingKeys.includes(
+                        subscriptionCheckKey(record.id, true),
+                      )}
                       onClick={() => props.runCheck(record.id, true)}
                     >
                       {t("subscription.check_transfer")}
@@ -1765,6 +2051,227 @@ const SubscriptionList = (props: {
         }}
       />
     </VStack>
+  )
+}
+
+const SubscriptionEpisodeSourcesModal = (props: {
+  opened: boolean
+  record?: Subscription
+  loading: boolean
+  sources: SubscriptionEpisodeSource[]
+  error: string
+  onClose: () => void
+}) => {
+  const t = useT()
+  const groupedSources = createMemo(() => {
+    const groups = new Map<number, SubscriptionEpisodeSource[]>()
+    const sorted = [...props.sources].sort((left, right) => {
+      if (left.season !== right.season) return left.season - right.season
+      if (left.episode !== right.episode) return left.episode - right.episode
+      return left.selected_at.localeCompare(right.selected_at)
+    })
+    for (const item of sorted) {
+      const list = groups.get(item.season) || []
+      list.push(item)
+      groups.set(item.season, list)
+    }
+    return Array.from(groups.entries()).map(([season, items]) => ({
+      season,
+      items,
+    }))
+  })
+
+  const seasonLabel = (season: number) => {
+    if (props.record?.media_type === "movie") {
+      return t("subscription.detail_movie")
+    }
+    return t("subscription.detail_season", { season })
+  }
+
+  const episodeLabel = (item: SubscriptionEpisodeSource) => {
+    if (props.record?.media_type === "movie") {
+      return t("subscription.detail_movie")
+    }
+    return item.episode > 0 ? `E${String(item.episode).padStart(2, "0")}` : "-"
+  }
+
+  const statusLabel = (status?: string) => {
+    if (!status) return "-"
+    switch (status) {
+      case "pending":
+      case "transferring":
+      case "transferred":
+      case "skipped":
+      case "failed":
+        return t(`subscription.item_statuses.${status}`)
+      case "idle":
+      case "running":
+      case "success":
+        return t(`subscription.statuses.${status}`)
+      default:
+        return status
+    }
+  }
+
+  return (
+    <Modal
+      opened={props.opened}
+      onClose={props.onClose}
+      scrollBehavior="inside"
+      size="xl"
+    >
+      <ModalOverlay />
+      <ModalContent w="calc(100vw - 1.5rem)" maxW="72rem">
+        <ModalCloseButton />
+        <ModalHeader css={{ overflowWrap: "break-word" }}>
+          {t("subscription.detail_title", {
+            name: props.record?.name || "-",
+          })}
+        </ModalHeader>
+        <ModalBody>
+          <VStack spacing="$4" alignItems="stretch">
+            <Show when={props.record}>
+              {(record) => (
+                <VStack alignItems="stretch" spacing="$1">
+                  <Text
+                    fontWeight="$semibold"
+                    css={{ wordBreak: "break-word" }}
+                  >
+                    {record().name}
+                  </Text>
+                  <Text color="$neutral11" fontSize="$sm">
+                    #{record().id} · {record().tmdb_name || "-"}
+                    <Show when={record().tmdb_year}>
+                      {(year) => ` (${year()})`}
+                    </Show>
+                  </Text>
+                </VStack>
+              )}
+            </Show>
+
+            <Show when={props.loading}>
+              <Text color="$neutral11">{t("global.loading")}</Text>
+            </Show>
+
+            <Show when={!props.loading && props.error}>
+              <Box
+                border="1px solid"
+                borderColor="$danger6"
+                rounded="$md"
+                p="$4"
+              >
+                <Text color="$danger11" css={{ wordBreak: "break-word" }}>
+                  {props.error}
+                </Text>
+              </Box>
+            </Show>
+
+            <Show
+              when={
+                !props.loading && !props.error && groupedSources().length === 0
+              }
+            >
+              <Box
+                border="1px solid"
+                borderColor="$neutral6"
+                rounded="$md"
+                p="$4"
+              >
+                <Text color="$neutral11">{t("subscription.detail_empty")}</Text>
+              </Box>
+            </Show>
+
+            <For each={groupedSources()}>
+              {(group) => (
+                <VStack alignItems="stretch" spacing="$2">
+                  <Text fontWeight="$semibold">
+                    {seasonLabel(group.season)}
+                  </Text>
+                  <Box
+                    w="$full"
+                    overflowX="auto"
+                    border="1px solid"
+                    borderColor="$neutral6"
+                    rounded="$md"
+                  >
+                    <Table dense highlightOnHover minW="64rem">
+                      <Thead>
+                        <Tr>
+                          <Th>{t("subscription.detail_episode")}</Th>
+                          <Th>{t("subscription.detail_status")}</Th>
+                          <Th>{t("subscription.detail_source_type")}</Th>
+                          <Th>{t("subscription.detail_source_provider")}</Th>
+                          <Th>{t("subscription.detail_file_name")}</Th>
+                          <Th>{t("subscription.detail_worker")}</Th>
+                          <Th>{t("subscription.detail_selected_at")}</Th>
+                        </Tr>
+                      </Thead>
+                      <Tbody>
+                        <For each={group.items}>
+                          {(item) => (
+                            <Tr>
+                              <Td>{episodeLabel(item)}</Td>
+                              <Td>
+                                <Badge
+                                  colorScheme={
+                                    statusColor[item.status] || "neutral"
+                                  }
+                                >
+                                  {statusLabel(item.status)}
+                                </Badge>
+                              </Td>
+                              <Td>
+                                <Badge colorScheme="info">
+                                  {shortSourceTypeLabel(
+                                    item.source_type,
+                                    t("subscription.source_types.manual"),
+                                  )}
+                                </Badge>
+                              </Td>
+                              <Td>
+                                <Badge colorScheme="accent">
+                                  {shortProviderLabel(item.source_provider)}
+                                </Badge>
+                              </Td>
+                              <Td maxW="26rem">
+                                <Show
+                                  when={
+                                    safeShareURL(item.share_url) &&
+                                    item.file_name
+                                  }
+                                  fallback={
+                                    <Text css={{ wordBreak: "break-all" }}>
+                                      {item.file_name || "-"}
+                                    </Text>
+                                  }
+                                >
+                                  <Text
+                                    as="a"
+                                    href={safeShareURL(item.share_url)}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    color="$info11"
+                                    css={{ wordBreak: "break-all" }}
+                                  >
+                                    {item.file_name}
+                                  </Text>
+                                </Show>
+                              </Td>
+                              <Td>{item.worker_name || "-"}</Td>
+                              <Td>{formatTimestampLabel(item.selected_at)}</Td>
+                            </Tr>
+                          )}
+                        </For>
+                      </Tbody>
+                    </Table>
+                  </Box>
+                </VStack>
+              )}
+            </For>
+          </VStack>
+        </ModalBody>
+      </ModalContent>
+    </Modal>
   )
 }
 

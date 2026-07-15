@@ -1,6 +1,17 @@
 export type SubscriptionSourceType = "manual" | "telegram" | "pansou"
 export type SubscriptionStatus = "idle" | "running" | "success" | "failed"
 export type SubscriptionMediaType = "tv" | "movie"
+export type SubscriptionArchiveStatus = "ongoing" | "completed" | "stalled"
+
+export interface SubscriptionProgress {
+  archive_status: SubscriptionArchiveStatus
+  latest_season?: number
+  latest_episode?: number
+  missing_episodes: number[]
+  completed_episodes: number
+  expected_episodes?: number
+  last_episode_added_at?: string
+}
 
 export type SubscriptionStorageProvider =
   | "pan123"
@@ -41,6 +52,7 @@ export interface Subscription {
   last_tree_hash: string
   last_status: SubscriptionStatus
   last_error: string
+  progress?: SubscriptionProgress
 }
 
 export interface SubscriptionItem {
@@ -79,6 +91,46 @@ export interface SubscriptionRun {
   changed_count: number
   transferred_count: number
   error: string
+  subscription_name?: string
+  subscription_source_type?: SubscriptionSourceType
+}
+
+export type SubscriptionRunView = "changes" | "failures"
+
+export interface SubscriptionRunQuery {
+  subscription_id?: number
+  view?: SubscriptionRunView
+  status?: SubscriptionStatus
+  source_type?: SubscriptionSourceType
+  keyword?: string
+  page?: number
+  per_page?: number
+}
+
+export interface SubscriptionBoard {
+  subscription_count: number
+  changed_run_count: number
+  added_count: number
+  changed_count: number
+  failure_count: number
+}
+
+export interface SubscriptionEpisodeSource {
+  id: number
+  created_at: string
+  updated_at: string
+  subscription_id: number
+  season: number
+  episode: number
+  source_item_id: number
+  source_type: SubscriptionSourceType
+  source_provider: string
+  share_url: string
+  file_name: string
+  cluster_job_id: string
+  selected_at: string
+  status: string
+  worker_name: string
 }
 
 export interface SubscriptionRunResult {
