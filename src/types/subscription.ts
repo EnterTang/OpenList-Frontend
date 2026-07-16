@@ -37,6 +37,7 @@ export interface Subscription {
   target_root?: string
   temp_target?: SubscriptionStorageTarget
   delivery_target?: SubscriptionStorageTarget
+  preferred_worker_node_id?: string
   transfer_enabled: boolean
   tmdb_id: number
   tmdb_name: string

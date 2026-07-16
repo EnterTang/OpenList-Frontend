@@ -71,6 +71,7 @@ import {
   SubscriptionStorageProvider,
   SubscriptionStorageTarget,
   SubscriptionTelegramAuthResp,
+  ClusterNode,
 } from "~/types"
 import {
   etfArchiveTMDBSearch,
@@ -89,6 +90,7 @@ import {
   subscriptionTelegramSignIn,
   subscriptionTelegramStatus,
   subscriptionUpdate,
+  clusterListNodes,
 } from "~/utils"
 import { Container } from "./Container"
 
@@ -488,6 +490,7 @@ export const SubscriptionManagement = () => {
   const [page, setPage] = createSignal(1)
   const [total, setTotal] = createSignal(0)
   const [records, setRecords] = createSignal<Subscription[]>([])
+  const [clusterNodes, setClusterNodes] = createSignal<ClusterNode[]>([])
   const [formSourceType, setFormSourceType] =
     createSignal<SubscriptionSourceType>("telegram")
   const [manualLinksText, setManualLinksText] = createSignal("")
@@ -501,6 +504,7 @@ export const SubscriptionManagement = () => {
     seasons: [],
     latest_season_episode_start: 0,
     latest_season_episode_end: 0,
+    preferred_worker_node_id: "",
   })
   const [seasonOptions, setSeasonOptions] = createSignal<number[]>([])
   const [tmdbQuery, setTMDBQuery] = createSignal("")
@@ -544,6 +548,7 @@ export const SubscriptionManagement = () => {
   const [tmdbSearchLoading, searchTMDB] = useFetch(etfArchiveTMDBSearch)
   const [configLoading, loadConfig] = useFetch(subscriptionConfigGet)
   const [saveConfigLoading, saveConfig] = useFetch(subscriptionConfigSave)
+  const [, loadClusterNodes] = useFetch(clusterListNodes)
   const [telegramStatusLoading, loadTelegramStatus] = useFetch(
     subscriptionTelegramStatus,
   )
@@ -568,6 +573,34 @@ export const SubscriptionManagement = () => {
     const resp = await loadConfig()
     handleResp(resp, (data) => setConfig(fillConfig(data)))
   }
+
+  const refreshClusterNodes = async () => {
+    const resp = await loadClusterNodes()
+    if (resp.code === 200) setClusterNodes(resp.data || [])
+  }
+
+  const preferredWorkerOptions = createMemo(() => {
+    const selected = form().preferred_worker_node_id || ""
+    return clusterNodes().filter(
+      (node) =>
+        node.role === "worker" ||
+        node.role === "hybrid" ||
+        node.id === selected,
+    )
+  })
+
+  const missingPreferredWorker = createMemo(() => {
+    const selected = form().preferred_worker_node_id || ""
+    return selected && !clusterNodes().some((node) => node.id === selected)
+      ? selected
+      : ""
+  })
+
+  const workerSelectable = (node: ClusterNode) =>
+    (node.role === "worker" || node.role === "hybrid") &&
+    node.status === "online" &&
+    !node.drain &&
+    !node.disabled
 
   const applyFilters = () => {
     setPage(1)
@@ -646,6 +679,7 @@ export const SubscriptionManagement = () => {
       seasons: [],
       latest_season_episode_start: 0,
       latest_season_episode_end: 0,
+      preferred_worker_node_id: "",
     })
     setSeasonOptions([])
     setTMDBQuery("")
@@ -974,6 +1008,7 @@ export const SubscriptionManagement = () => {
   onMount(() => {
     refresh()
     refreshConfig().then(() => refreshTelegramStatus())
+    void refreshClusterNodes()
   })
 
   return (
@@ -1321,9 +1356,70 @@ export const SubscriptionManagement = () => {
                           </FormField>
                         </Show>
                         <FormField
-                          label={t("subscription.worker_storage_routing")}
+                          label={t("subscription.preferred_worker")}
                           full
                         >
+                          <Select
+                            value={
+                              form().preferred_worker_node_id || "__auto__"
+                            }
+                            onChange={(value) =>
+                              updateForm(
+                                "preferred_worker_node_id",
+                                value === "__auto__" ? "" : value,
+                              )
+                            }
+                          >
+                            <SelectTrigger w="$full">
+                              <SelectPlaceholder>
+                                {t("subscription.preferred_worker_auto")}
+                              </SelectPlaceholder>
+                              <SelectValue />
+                              <SelectIcon />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectListbox>
+                                <SelectOption value="__auto__">
+                                  <SelectOptionText>
+                                    {t("subscription.preferred_worker_auto")}
+                                  </SelectOptionText>
+                                  <SelectOptionIndicator />
+                                </SelectOption>
+                                <Show when={missingPreferredWorker()}>
+                                  {(nodeID) => (
+                                    <SelectOption value={nodeID()} disabled>
+                                      <SelectOptionText>
+                                        {nodeID()} ·{" "}
+                                        {t(
+                                          "subscription.preferred_worker_unavailable",
+                                        )}
+                                      </SelectOptionText>
+                                      <SelectOptionIndicator />
+                                    </SelectOption>
+                                  )}
+                                </Show>
+                                <For each={preferredWorkerOptions()}>
+                                  {(node) => (
+                                    <SelectOption
+                                      value={node.id}
+                                      disabled={!workerSelectable(node)}
+                                    >
+                                      <SelectOptionText>
+                                        {node.name || node.id} · {node.id}
+                                        {!workerSelectable(node)
+                                          ? ` · ${t("subscription.preferred_worker_unavailable")}`
+                                          : ""}
+                                      </SelectOptionText>
+                                      <SelectOptionIndicator />
+                                    </SelectOption>
+                                  )}
+                                </For>
+                              </SelectListbox>
+                            </SelectContent>
+                          </Select>
+                          <Text color="$neutral11" fontSize="$sm" mt="$2">
+                            {t("subscription.preferred_worker_hint")}
+                          </Text>
                           <Text color="$neutral11" fontSize="$sm">
                             {t("subscription.worker_storage_routing_hint")}
                           </Text>
