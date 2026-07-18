@@ -1277,13 +1277,13 @@ export const SubscriptionManagement = () => {
                                 }
                               >
                                 {(season) => {
-                                  const checked = () =>
-                                    selectedSeasons().includes(season)
                                   return (
                                     <Checkbox
-                                      checked={checked()}
-                                      disabled={
-                                        checked() &&
+                                      checked={() =>
+                                        selectedSeasons().includes(season)
+                                      }
+                                      disabled={() =>
+                                        selectedSeasons().includes(season) &&
                                         selectedSeasons().length === 1
                                       }
                                       onChange={(e) =>
