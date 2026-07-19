@@ -22,6 +22,7 @@ import {
   Subscription,
   SubscriptionBoard,
   SubscriptionConfig,
+  SubscriptionConfigResponse,
   SubscriptionDetail,
   SubscriptionEpisodeSource,
   SubscriptionTelegramAuthResp,
@@ -429,7 +430,7 @@ export const subscriptionGet = (id: number): PResp<SubscriptionDetail> => {
 }
 
 export const subscriptionDelete = (id: number): PEmptyResp => {
-  return r.post("/admin/subscription/delete", { id })
+  return r.post("/admin/subscription/delete", { id }, { timeout: 20_000 })
 }
 
 export const subscriptionCheck = (
@@ -479,13 +480,13 @@ export const subscriptionResourceSearch = (
   })
 }
 
-export const subscriptionConfigGet = (): PResp<SubscriptionConfig> => {
+export const subscriptionConfigGet = (): PResp<SubscriptionConfigResponse> => {
   return r.get("/admin/subscription/config")
 }
 
 export const subscriptionConfigSave = (
   config: SubscriptionConfig,
-): PResp<SubscriptionConfig> => {
+): PResp<SubscriptionConfigResponse> => {
   return r.post("/admin/subscription/config", config)
 }
 
@@ -519,6 +520,12 @@ export const subscriptionTelegramLogout =
 
 export const clusterListNodes = (): PResp<ClusterNode[]> => {
   return r.get("/admin/cluster/nodes")
+}
+
+export const clusterDeleteNode = (
+  nodeId: string,
+): PResp<{ deleted: boolean }> => {
+  return r.post(`/admin/cluster/nodes/${encodeURIComponent(nodeId)}/delete`)
 }
 
 export const clusterGetConfig = (): PResp<ClusterRuntimeConfig> => {

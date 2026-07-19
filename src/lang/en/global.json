@@ -6,6 +6,7 @@
   "save": "Save",
   "update": "Update",
   "copied": "Copied",
+  "copy_failed": "Could not access the clipboard. Copy the text manually.",
   "delete_success": "Deleted Successfully",
   "save_success": "Saved Successfully",
   "update_success": "Updated Successfully",

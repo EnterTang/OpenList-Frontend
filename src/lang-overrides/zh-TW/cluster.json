@@ -17,6 +17,7 @@
     "drain_node": "排空 Worker",
     "disable_node": "停用 Worker",
     "revoke_node": "撤銷 Worker",
+    "remove_node": "永久移除 Worker",
     "retry_job": "重試任務",
     "view_details": "查看詳情",
     "bring_online": "啟用 Worker",
@@ -157,6 +158,7 @@
     "media_type": "媒體類型",
     "node": "Worker",
     "notification_status": "通知狀態",
+    "retries": "重試次數",
     "parent_job": "父任務",
     "received_at": "接收時間",
     "role": "角色",
@@ -167,6 +169,7 @@
     "size": "大小",
     "source_message": "來源訊息",
     "source_objects": "來源檔案",
+    "stage": "目前階段",
     "started_at": "開始時間",
     "status": "狀態",
     "subscription": "訂閱",
@@ -194,16 +197,21 @@
   },
   "confirm": {
     "clear_failed_jobs": "確定清除任務看板內的全部失敗任務？任務仍會保留在封存記錄中。",
-    "revoke_node": "確定撤銷此 Worker？重新註冊後才能再次連線。"
+    "disable_node": "確定停用此 Worker？系統將停止分派新任務，並關閉目前連線。",
+    "drain_node": "確定排空此 Worker？系統將停止分派新任務，並等待目前任務執行完成。",
+    "revoke_node": "確定撤銷此 Worker？重新註冊後才能再次連線。",
+    "remove_node": "確定永久移除此 Worker？節點身分、工作階段、掛載清單和下發設定將被刪除；歷史任務和上傳結果會保留。若該 Worker 仍在執行，它可能會重新註冊。"
   },
   "notifications": {
     "failed_jobs_cleared": "已封存 {{count}} 個失敗任務",
     "inventory_requested": "已傳送掛載查詢要求",
     "job_requeued": "任務已進入重試佇列",
-    "node_state_updated": "Worker 狀態已更新"
+    "node_state_updated": "Worker 狀態已更新",
+    "node_removed": "Worker 已永久移除"
   },
   "job_details": {
     "title": "任務詳情",
+    "stages": "執行階段",
     "error": "執行錯誤",
     "task_context": "任務上下文",
     "invalid_context": "儲存的任務上下文不是有效的 JSON。"
@@ -354,6 +362,7 @@
     "consumed": "已消費"
   },
   "notification_status": {
+    "not_started": "未進入通知",
     "pending": "待通知",
     "sending": "通知中",
     "succeeded": "通知成功",
@@ -366,6 +375,28 @@
     "running": "清理中",
     "succeeded": "清理成功",
     "failed": "清理失敗"
+  },
+  "stage_status": {
+    "pending": "待執行",
+    "permitted": "已許可",
+    "running": "執行中",
+    "succeeded": "已完成",
+    "failed": "失敗",
+    "skipped": "已跳過",
+    "unknown": "未知"
+  },
+  "stage": {
+    "saving_share": "轉存分享",
+    "discovering_files": "發現檔案",
+    "downloading": "下載中",
+    "source_cleanup": "清理來源檔案",
+    "uploading_mobile": "上傳到目標網盤",
+    "result_persisting": "儲存上傳結果",
+    "worker_media_cleanup": "清理 Worker 媒體",
+    "result_reporting": "上報結果",
+    "etf_materializing": "產生 ETF 資訊",
+    "etf_archiving": "封存 ETF 資訊",
+    "target_notifying": "通知目標服務"
   },
   "media_type": {
     "tv": "劇集",

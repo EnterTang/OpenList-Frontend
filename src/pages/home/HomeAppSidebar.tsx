@@ -47,6 +47,9 @@ export const HomeAppSidebar = (props: {
     localStorage.setItem("home_app_sidebar_collapsed", String(next))
   }
 
+  const toggleLabel = () =>
+    t(collapsed() ? "home.sidebar.expand" : "home.sidebar.collapse")
+
   const selectPage = (page: HomePageKey) => {
     props.setActivePage(page)
     localStorage.setItem("home_app_page", page)
@@ -77,9 +80,10 @@ export const HomeAppSidebar = (props: {
           <Show when={!collapsed()}>
             <Text fontWeight="$semibold">{t("home.sidebar.title")}</Text>
           </Show>
-          <Tooltip label={t("home.sidebar.collapse")}>
+          <Tooltip label={toggleLabel()}>
             <IconButton
-              aria-label={t("home.sidebar.collapse")}
+              aria-label={toggleLabel()}
+              aria-expanded={!collapsed()}
               size="sm"
               compact
               icon={<CgMoreO />}

@@ -139,7 +139,10 @@ const Overview = (props: { embedded?: boolean } = {}) => {
         gap="$4"
       >
         <Panel titleKey="cluster.overview.recent_jobs">
-          <Show when={!jobsLoading()} fallback={<LoadingBlock />}>
+          <Show
+            when={!jobsLoading() || jobs().length > 0}
+            fallback={<LoadingBlock />}
+          >
             <Show
               when={recentJobs().length > 0}
               fallback={
@@ -193,7 +196,10 @@ const Overview = (props: { embedded?: boolean } = {}) => {
 
         <VStack alignItems="stretch" spacing="$4">
           <Panel titleKey="cluster.overview.nodes">
-            <Show when={!nodesLoading()} fallback={<LoadingBlock />}>
+            <Show
+              when={!nodesLoading() || nodes().length > 0}
+              fallback={<LoadingBlock />}
+            >
               <Show
                 when={nodes().length > 0}
                 fallback={
@@ -230,7 +236,10 @@ const Overview = (props: { embedded?: boolean } = {}) => {
           </Panel>
 
           <Panel titleKey="cluster.overview.latest_results">
-            <Show when={!resultsLoading()} fallback={<LoadingBlock />}>
+            <Show
+              when={!resultsLoading() || results().length > 0}
+              fallback={<LoadingBlock />}
+            >
               <Show
                 when={results().length > 0}
                 fallback={

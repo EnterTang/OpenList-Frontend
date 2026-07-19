@@ -25,14 +25,19 @@ import {
   useColorModeValue,
 } from "@hope-ui/solid"
 import { AiOutlineSearch } from "solid-icons/ai"
-import { createSignal, For, Show } from "solid-js"
+import { createSignal, For, onMount, Show } from "solid-js"
 import { useFetch, useT, useTitle } from "~/hooks"
 import { getSetting } from "~/store"
 import {
   SubscriptionResourceSearchResult,
   SubscriptionSourceType,
 } from "~/types"
-import { handleResp, notify, subscriptionResourceSearch } from "~/utils"
+import {
+  handleResp,
+  notify,
+  subscriptionConfigGet,
+  subscriptionResourceSearch,
+} from "~/utils"
 
 const searchSources: SubscriptionSourceType[] = ["telegram", "pansou"]
 
@@ -69,12 +74,29 @@ const ResourceSearch = (props: {
   const [sourceErrors, setSourceErrors] = createSignal<Record<string, string>>(
     {},
   )
-  const [loading, search] = useFetch(() =>
-    subscriptionResourceSearch(
-      query().trim(),
-      sources(),
-      Number(limit()) || 40,
-    ),
+  const [sourceCapabilities, setSourceCapabilities] = createSignal<
+    Partial<
+      Record<
+        SubscriptionSourceType,
+        {
+          configured: boolean
+          available: boolean
+          unavailable_reason?: string
+        }
+      >
+    >
+  >({})
+  const [capabilitiesLoading, loadConfig] = useFetch(
+    subscriptionConfigGet,
+    true,
+  )
+  const [loading, search] = useFetch(
+    (selectedSources: SubscriptionSourceType[]) =>
+      subscriptionResourceSearch(
+        query().trim(),
+        selectedSources,
+        Number(limit()) || 40,
+      ),
   )
   useTitle(
     () =>
@@ -85,7 +107,28 @@ const ResourceSearch = (props: {
       }`,
   )
 
+  const sourceAvailable = (source: SubscriptionSourceType) =>
+    sourceCapabilities()[source]?.available !== false
+
+  const applySourceCapabilities = (
+    capabilities?: ReturnType<typeof sourceCapabilities>,
+  ) => {
+    if (!capabilities) return
+    setSourceCapabilities(capabilities)
+    setSources((current) =>
+      current.filter((source) => capabilities[source]?.available !== false),
+    )
+  }
+
+  onMount(async () => {
+    const resp = await loadConfig()
+    handleResp(resp, (data) =>
+      applySourceCapabilities(data.source_capabilities),
+    )
+  })
+
   const toggleSource = (source: SubscriptionSourceType, checked: boolean) => {
+    if (!sourceAvailable(source)) return
     setSources((prev) => {
       if (checked) return Array.from(new Set([...prev, source]))
       return prev.filter((item) => item !== source)
@@ -97,14 +140,19 @@ const ResourceSearch = (props: {
       notify.warning(t("global.empty_input"))
       return
     }
-    if (sources().length === 0) {
+    const availableSources = sources().filter(sourceAvailable)
+    if (availableSources.length === 0) {
       notify.warning(t("subscription.resource_search_source_required"))
       return
     }
-    const resp = await search()
+    if (availableSources.length !== sources().length) {
+      setSources(availableSources)
+    }
+    const resp = await search(availableSources)
     handleResp(resp, (data) => {
       setResults(data.results || [])
       setSourceErrors(data.source_errors || {})
+      applySourceCapabilities(data.source_capabilities)
     })
   }
 
@@ -164,18 +212,33 @@ const ResourceSearch = (props: {
               {(source) => (
                 <Checkbox
                   checked={sources().includes(source)}
+                  disabled={!sourceAvailable(source)}
                   onChange={(e: { currentTarget: HTMLInputElement }) =>
                     toggleSource(source, e.currentTarget.checked)
                   }
                 >
-                  {t(`subscription.source_types.${source}`)}
+                  <VStack spacing="$0" alignItems="start">
+                    <Text>{t(`subscription.source_types.${source}`)}</Text>
+                    <Show
+                      when={sourceCapabilities()[source]?.available === false}
+                    >
+                      <Text color="$warning11" fontSize="$xs">
+                        {t(
+                          `subscription.source_unavailable_reasons.${
+                            sourceCapabilities()[source]?.unavailable_reason ||
+                            "not_configured"
+                          }`,
+                        )}
+                      </Text>
+                    </Show>
+                  </VStack>
                 </Checkbox>
               )}
             </For>
             <Button
               colorScheme="accent"
               leftIcon={<AiOutlineSearch />}
-              loading={loading()}
+              loading={loading() || capabilitiesLoading()}
               onClick={runSearch}
             >
               {t("subscription.search")}

@@ -50,10 +50,12 @@ import {
 } from "solid-icons/ai"
 import {
   JSXElement,
+  createEffect,
   createMemo,
   createSignal,
   For,
   Match,
+  onCleanup,
   onMount,
   Show,
   Switch,
@@ -64,6 +66,7 @@ import {
   Subscription,
   SubscriptionArchiveStatus,
   SubscriptionConfig,
+  SubscriptionConfigSecretStatus,
   SubscriptionEpisodeSource,
   ETFArchiveTMDBCandidate,
   SubscriptionMediaType,
@@ -134,7 +137,10 @@ const sourceColor: Record<
   pansou: "accent",
 }
 
-const statusColor: Record<string, "neutral" | "info" | "success" | "danger"> = {
+const statusColor: Record<
+  string,
+  "neutral" | "info" | "success" | "warning" | "danger"
+> = {
   idle: "neutral",
   pending: "neutral",
   running: "info",
@@ -143,6 +149,7 @@ const statusColor: Record<string, "neutral" | "info" | "success" | "danger"> = {
   transferred: "success",
   skipped: "neutral",
   failed: "danger",
+  historical_succeeded_latest_failed: "warning",
 }
 
 const archiveStatusColor: Record<
@@ -152,6 +159,23 @@ const archiveStatusColor: Record<
   ongoing: "info",
   completed: "success",
   stalled: "warning",
+}
+
+const realtimeListenerColor = (
+  state: string,
+): "neutral" | "info" | "success" | "warning" | "danger" => {
+  switch (state) {
+    case "connected":
+      return "success"
+    case "starting":
+      return "info"
+    case "backing_off":
+      return "warning"
+    case "degraded":
+      return "danger"
+    default:
+      return "neutral"
+  }
 }
 
 const subscriptionCheckKey = (id: number, transfer: boolean) =>
@@ -237,6 +261,10 @@ const emptyTelegramConfig = (): SubscriptionConfig["telegram"] => ({
   command_env: [],
   command_timeout_seconds: 30,
   limit: 40,
+  realtime_enabled: false,
+  realtime_groups: [],
+  realtime_candidate_wait_seconds: 120,
+  realtime_expected_providers: [],
 })
 
 const emptyPanSouConfig = {
@@ -286,6 +314,14 @@ const fillTelegramConfig = (
   return {
     ...emptyTelegramConfig(),
     ...rest,
+    realtime_groups: Array.isArray(source.realtime_groups)
+      ? source.realtime_groups
+      : [],
+    realtime_expected_providers: Array.isArray(
+      source.realtime_expected_providers,
+    )
+      ? source.realtime_expected_providers
+      : [],
     quark: fillTelegramPanConfig(source.quark, quark_channels),
     aliyun_drive: fillTelegramPanConfig(
       source.aliyun_drive,
@@ -514,6 +550,8 @@ export const SubscriptionManagement = () => {
   const [selectedTMDBCandidate, setSelectedTMDBCandidate] =
     createSignal<ETFArchiveTMDBCandidate>()
   const [config, setConfig] = createSignal<SubscriptionConfig>(defaultConfig())
+  const [secretStatus, setSecretStatus] =
+    createSignal<SubscriptionConfigSecretStatus>()
   const [telegramAuth, setTelegramAuth] =
     createSignal<SubscriptionTelegramAuthResp>()
   const [telegramPhone, setTelegramPhone] = createSignal("")
@@ -569,10 +607,39 @@ export const SubscriptionManagement = () => {
     })
   }
 
+  const hasRealtimeSubscriptions = createMemo(() =>
+    records().some((record) => record.realtime_status?.enabled),
+  )
+
+  createEffect(() => {
+    if (tab() !== "list" || !hasRealtimeSubscriptions()) return
+    const interval = window.setInterval(() => void refresh(), 10_000)
+    onCleanup(() => window.clearInterval(interval))
+  })
+
   const refreshConfig = async () => {
     const resp = await loadConfig()
-    handleResp(resp, (data) => setConfig(fillConfig(data)))
+    handleResp(resp, (data) => {
+      setConfig(fillConfig(data))
+      setSecretStatus(data.secret_status)
+    })
   }
+
+  const secretConfigured = (path: string) =>
+    Boolean(secretStatus()?.configured?.[path])
+
+  const secretClearMarker = () =>
+    secretStatus()?.clear_marker || "__OPENLIST_SECRET_CLEAR__"
+
+  const visibleSecretValue = (value?: string) =>
+    value === secretClearMarker() ? "" : value || ""
+
+  const apiHashAvailable = () =>
+    config().telegram.api_hash !== secretClearMarker() &&
+    Boolean(
+      config().telegram.api_hash.trim() ||
+      secretConfigured("telegram.api_hash"),
+    )
 
   const refreshClusterNodes = async () => {
     const resp = await loadClusterNodes()
@@ -717,6 +784,16 @@ export const SubscriptionManagement = () => {
     return form().season ? [form().season || 1] : []
   }
 
+  const allSeasonsSelected = () => {
+    const options = seasonOptions()
+    const selected = selectedSeasons()
+    return (
+      options.length > 1 &&
+      selected.length === options.length &&
+      options.every((season) => selected.includes(season))
+    )
+  }
+
   const toggleSeason = (season: number, checked: boolean) => {
     const next = new Set(selectedSeasons())
     if (checked) {
@@ -772,9 +849,17 @@ export const SubscriptionManagement = () => {
   }
 
   const submitSubscription = async () => {
+    if (!form().name?.trim()) {
+      notify.warning(t("subscription.name_required"))
+      return
+    }
     const manualLinks = splitLines(manualLinksText())
     if (formSourceType() === "manual" && manualLinks.length === 0) {
       notify.warning(t("subscription.manual_links_required"))
+      return
+    }
+    if (form().media_type !== "movie" && selectedSeasons().length === 0) {
+      notify.warning(t("subscription.season_required"))
       return
     }
     const episodeStart = form().latest_season_episode_start || 0
@@ -819,7 +904,13 @@ export const SubscriptionManagement = () => {
     try {
       const resp = await subscriptionCheck(id, transfer)
       handleResp(resp, () => {
-        notify.success(t("subscription.check_finished"))
+        notify.success(
+          t(
+            transfer
+              ? "subscription.check_transfer_finished"
+              : "subscription.check_finished",
+          ),
+        )
         refresh()
       })
     } finally {
@@ -920,6 +1011,7 @@ export const SubscriptionManagement = () => {
     const resp = await saveConfig(buildConfigPayload(config()))
     handleResp(resp, (data) => {
       setConfig(fillConfig(data))
+      setSecretStatus(data.secret_status)
       notify.success(t("global.save_success"))
     })
   }
@@ -932,6 +1024,7 @@ export const SubscriptionManagement = () => {
       return false
     }
     setConfig(fillConfig(resp.data))
+    setSecretStatus(resp.data.secret_status)
     return true
   }
 
@@ -958,7 +1051,7 @@ export const SubscriptionManagement = () => {
   }
 
   const sendTelegramCode = async () => {
-    if (!config().telegram.api_id || !config().telegram.api_hash.trim()) {
+    if (!config().telegram.api_id || !apiHashAvailable()) {
       notify.error(t("subscription.telegram_api_required"))
       return
     }
@@ -1279,10 +1372,10 @@ export const SubscriptionManagement = () => {
                                 {(season) => {
                                   return (
                                     <Checkbox
-                                      checked={() =>
-                                        selectedSeasons().includes(season)
-                                      }
-                                      disabled={() =>
+                                      checked={selectedSeasons().includes(
+                                        season,
+                                      )}
+                                      disabled={
                                         selectedSeasons().includes(season) &&
                                         selectedSeasons().length === 1
                                       }
@@ -1299,6 +1392,11 @@ export const SubscriptionManagement = () => {
                                 }}
                               </For>
                             </HStack>
+                            <Show when={allSeasonsSelected()}>
+                              <Text color="$neutral11" fontSize="$sm">
+                                {t("subscription.season_selection_hint")}
+                              </Text>
+                            </Show>
                           </Show>
                         </FormField>
                         <Show when={form().media_type !== "movie"}>
@@ -1540,15 +1638,45 @@ export const SubscriptionManagement = () => {
                         />
                       </FormField>
                       <FormField label={t("subscription.api_hash")}>
-                        <Input
-                          value={config().telegram.api_hash}
-                          onInput={(e) =>
-                            updateTelegramConfig(
-                              "api_hash",
-                              e.currentTarget.value,
-                            )
-                          }
-                        />
+                        <HStack spacing="$2" alignItems="center">
+                          <Input
+                            type="password"
+                            value={visibleSecretValue(
+                              config().telegram.api_hash,
+                            )}
+                            placeholder={
+                              config().telegram.api_hash === secretClearMarker()
+                                ? t("subscription.secret_will_clear")
+                                : secretConfigured("telegram.api_hash")
+                                  ? t(
+                                      "subscription.secret_configured_placeholder",
+                                    )
+                                  : undefined
+                            }
+                            onInput={(e) =>
+                              updateTelegramConfig(
+                                "api_hash",
+                                e.currentTarget.value,
+                              )
+                            }
+                          />
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={
+                              !secretConfigured("telegram.api_hash") &&
+                              !config().telegram.api_hash
+                            }
+                            onClick={() =>
+                              updateTelegramConfig(
+                                "api_hash",
+                                secretClearMarker(),
+                              )
+                            }
+                          >
+                            {t("subscription.secret_clear")}
+                          </Button>
+                        </HStack>
                       </FormField>
                       <FormField label={t("subscription.limit")}>
                         <Input
@@ -1558,6 +1686,71 @@ export const SubscriptionManagement = () => {
                             updateTelegramConfig(
                               "limit",
                               numberValue(e.currentTarget.value),
+                            )
+                          }
+                        />
+                      </FormField>
+                      <FormField label={t("subscription.realtime_enabled")}>
+                        <HopeSwitch
+                          checked={Boolean(config().telegram.realtime_enabled)}
+                          onChange={(e: { currentTarget: HTMLInputElement }) =>
+                            updateTelegramConfig(
+                              "realtime_enabled",
+                              e.currentTarget.checked,
+                            )
+                          }
+                        />
+                      </FormField>
+                      <FormField
+                        label={t("subscription.realtime_wait_seconds")}
+                      >
+                        <Input
+                          type="number"
+                          min="0"
+                          max="600"
+                          value={
+                            config().telegram.realtime_candidate_wait_seconds ??
+                            120
+                          }
+                          onInput={(e) =>
+                            updateTelegramConfig(
+                              "realtime_candidate_wait_seconds",
+                              numberValue(e.currentTarget.value),
+                            )
+                          }
+                        />
+                      </FormField>
+                      <FormField label={t("subscription.realtime_groups")} full>
+                        <Textarea
+                          rows={3}
+                          value={joinLines(config().telegram.realtime_groups)}
+                          placeholder={t(
+                            "subscription.realtime_groups_placeholder",
+                          )}
+                          onInput={(e) =>
+                            updateTelegramConfig(
+                              "realtime_groups",
+                              splitLines(e.currentTarget.value),
+                            )
+                          }
+                        />
+                      </FormField>
+                      <FormField
+                        label={t("subscription.realtime_expected_providers")}
+                        full
+                      >
+                        <Textarea
+                          rows={2}
+                          value={joinLines(
+                            config().telegram.realtime_expected_providers,
+                          )}
+                          placeholder={t(
+                            "subscription.realtime_expected_providers_placeholder",
+                          )}
+                          onInput={(e) =>
+                            updateTelegramConfig(
+                              "realtime_expected_providers",
+                              splitLines(e.currentTarget.value),
                             )
                           }
                         />
@@ -1621,7 +1814,7 @@ export const SubscriptionManagement = () => {
                             }
                             disabled={
                               !config().telegram.api_id ||
-                              !config().telegram.api_hash.trim() ||
+                              !apiHashAvailable() ||
                               !telegramPhone().trim()
                             }
                             onClick={sendTelegramCode}
@@ -1658,6 +1851,7 @@ export const SubscriptionManagement = () => {
                           <TelegramPanConfigFields
                             panKey={item.key}
                             value={config().telegram[item.key]}
+                            secretStatus={secretStatus()}
                             onChange={(key, value) =>
                               updateTelegramPanConfig(item.key, key, value)
                             }
@@ -1864,7 +2058,10 @@ const SubscriptionList = (props: {
         </Select>
         <Select
           value={props.archiveStatus}
-          onChange={(value) => props.setArchiveStatus(value as ArchiveFilter)}
+          onChange={(value) => {
+            props.setArchiveStatus(value as ArchiveFilter)
+            props.applyFilters()
+          }}
         >
           <SelectTrigger w={{ "@initial": "$full", "@md": "10rem" }}>
             <SelectPlaceholder>
@@ -2063,6 +2260,68 @@ const SubscriptionList = (props: {
                   </Box>
                 </Box>
 
+                <Show
+                  when={
+                    record.realtime_status?.enabled
+                      ? record.realtime_status
+                      : undefined
+                  }
+                >
+                  {(realtime) => (
+                    <Box p="$2" bgColor="$neutral2" rounded="$sm">
+                      <HStack gap="$2" flexWrap="wrap">
+                        <Text color="$neutral11" fontSize="$sm">
+                          {t("subscription.realtime_status")}
+                        </Text>
+                        <Badge
+                          colorScheme={realtimeListenerColor(
+                            realtime().listener_state,
+                          )}
+                        >
+                          {t(
+                            `subscription.realtime_listener_states.${realtime().listener_state || "disabled"}`,
+                          )}
+                        </Badge>
+                        <Badge
+                          colorScheme={
+                            statusColor[realtime().delivery_status] || "neutral"
+                          }
+                        >
+                          {t(
+                            `subscription.realtime_delivery_status.${realtime().delivery_status || "idle"}`,
+                          )}
+                        </Badge>
+                        <Show when={realtime().active_job_count > 0}>
+                          <Text color="$neutral11" fontSize="$sm">
+                            {t("subscription.realtime_active_jobs", {
+                              count: realtime().active_job_count,
+                            })}
+                          </Text>
+                        </Show>
+                      </HStack>
+                      <Show when={realtime().last_event_at}>
+                        <Text color="$neutral11" fontSize="$sm">
+                          {t("subscription.realtime_last_event", {
+                            time: formatTimestampLabel(
+                              realtime().last_event_at,
+                            ),
+                            channel: realtime().last_message_channel || "-",
+                          })}
+                        </Text>
+                      </Show>
+                      <Show when={realtime().last_error}>
+                        <Text
+                          color="$danger11"
+                          fontSize="$sm"
+                          css={{ wordBreak: "break-word" }}
+                        >
+                          {realtime().last_error}
+                        </Text>
+                      </Show>
+                    </Box>
+                  )}
+                </Show>
+
                 <Show when={record.last_error}>
                   <Text
                     color="$danger11"
@@ -2200,6 +2459,8 @@ const SubscriptionEpisodeSourcesModal = (props: {
       case "skipped":
       case "failed":
         return t(`subscription.item_statuses.${status}`)
+      case "historical_succeeded_latest_failed":
+        return t("subscription.historical_succeeded_latest_failed")
       case "idle":
       case "running":
       case "success":
@@ -2290,7 +2551,7 @@ const SubscriptionEpisodeSourcesModal = (props: {
                     borderColor="$neutral6"
                     rounded="$md"
                   >
-                    <Table dense highlightOnHover minW="64rem">
+                    <Table dense highlightOnHover minW="92rem">
                       <Thead>
                         <Tr>
                           <Th>{t("subscription.detail_episode")}</Th>
@@ -2299,6 +2560,10 @@ const SubscriptionEpisodeSourcesModal = (props: {
                           <Th>{t("subscription.detail_source_provider")}</Th>
                           <Th>{t("subscription.detail_file_name")}</Th>
                           <Th>{t("subscription.detail_worker")}</Th>
+                          <Th>{t("subscription.detail_job")}</Th>
+                          <Th>{t("subscription.detail_stage")}</Th>
+                          <Th>{t("subscription.detail_notification")}</Th>
+                          <Th>{t("subscription.detail_error")}</Th>
                           <Th>{t("subscription.detail_selected_at")}</Th>
                         </Tr>
                       </Thead>
@@ -2310,10 +2575,14 @@ const SubscriptionEpisodeSourcesModal = (props: {
                               <Td>
                                 <Badge
                                   colorScheme={
-                                    statusColor[item.status] || "neutral"
+                                    statusColor[
+                                      item.effective_status || item.status
+                                    ] || "neutral"
                                   }
                                 >
-                                  {statusLabel(item.status)}
+                                  {statusLabel(
+                                    item.effective_status || item.status,
+                                  )}
                                 </Badge>
                               </Td>
                               <Td>
@@ -2354,6 +2623,84 @@ const SubscriptionEpisodeSourcesModal = (props: {
                                 </Show>
                               </Td>
                               <Td>{item.worker_name || "-"}</Td>
+                              <Td>
+                                <VStack spacing="$1" alignItems="start">
+                                  <Text
+                                    fontFamily="$mono"
+                                    fontSize="$xs"
+                                    css={{ wordBreak: "break-all" }}
+                                  >
+                                    {item.cluster_job_id || "-"}
+                                  </Text>
+                                  <Show when={item.job_status}>
+                                    <Badge
+                                      colorScheme={
+                                        statusColor[item.job_status || ""] ||
+                                        "neutral"
+                                      }
+                                    >
+                                      {t(
+                                        `cluster.job_status.${item.job_status}`,
+                                      )}
+                                    </Badge>
+                                  </Show>
+                                </VStack>
+                              </Td>
+                              <Td>
+                                <VStack spacing="$1" alignItems="start">
+                                  <Text fontSize="$sm">
+                                    {item.current_stage
+                                      ? t(`cluster.stage.${item.current_stage}`)
+                                      : "-"}
+                                  </Text>
+                                  <Show when={item.current_stage_status}>
+                                    <Badge colorScheme="info">
+                                      {t(
+                                        `cluster.stage_status.${item.current_stage_status}`,
+                                      )}
+                                    </Badge>
+                                  </Show>
+                                  <Show
+                                    when={
+                                      (item.current_stage_retry_count || 0) > 0
+                                    }
+                                  >
+                                    <Text color="$warning11" fontSize="$xs">
+                                      {t("subscription.detail_retry_count", {
+                                        count:
+                                          item.current_stage_retry_count || 0,
+                                      })}
+                                    </Text>
+                                  </Show>
+                                </VStack>
+                              </Td>
+                              <Td>
+                                <Show
+                                  when={
+                                    item.notification_display_status ||
+                                    item.job_notification_status
+                                  }
+                                  fallback={<Text>-</Text>}
+                                >
+                                  <Badge colorScheme="info">
+                                    {t(
+                                      `cluster.notification_status.${item.notification_display_status || item.job_notification_status}`,
+                                    )}
+                                  </Badge>
+                                </Show>
+                              </Td>
+                              <Td maxW="18rem">
+                                <Text
+                                  color="$danger11"
+                                  fontSize="$xs"
+                                  css={{ wordBreak: "break-word" }}
+                                >
+                                  {item.current_stage_error ||
+                                    item.job_last_error ||
+                                    item.item_last_error ||
+                                    "-"}
+                                </Text>
+                              </Td>
                               <Td>{formatTimestampLabel(item.selected_at)}</Td>
                             </Tr>
                           )}
@@ -2593,6 +2940,7 @@ const ConfigSection = (props: { title: string; children: JSXElement }) => {
 const TelegramPanConfigFields = (props: {
   panKey: TelegramPanKey
   value: TelegramPanConfig
+  secretStatus?: SubscriptionConfigSecretStatus
   onChange: <K extends keyof TelegramPanConfig>(
     key: K,
     value: TelegramPanConfig[K],
@@ -2601,6 +2949,16 @@ const TelegramPanConfigFields = (props: {
   const t = useT()
   const border = useColorModeValue("$neutral5", "$neutral7")
   const panelBg = useColorModeValue("$neutral1", "$neutral3")
+  const refreshTokenPath = () =>
+    `telegram.${props.panKey}.refresh_token` as const
+  const clearMarker = () =>
+    props.secretStatus?.clear_marker || "__OPENLIST_SECRET_CLEAR__"
+  const refreshTokenValue = () =>
+    props.value.refresh_token === clearMarker()
+      ? ""
+      : props.value.refresh_token || ""
+  const refreshTokenConfigured = () =>
+    Boolean(props.secretStatus?.configured?.[refreshTokenPath()])
   return (
     <Box
       gridColumn="1 / -1"
@@ -2633,13 +2991,33 @@ const TelegramPanConfigFields = (props: {
             }}
           >
             <FormField label={t("subscription.aliyun_web_refresh_token")}>
-              <Textarea
-                rows={3}
-                value={props.value.refresh_token || ""}
-                onInput={(e) =>
-                  props.onChange("refresh_token", e.currentTarget.value)
-                }
-              />
+              <VStack spacing="$2" alignItems="stretch">
+                <Input
+                  type="password"
+                  value={refreshTokenValue()}
+                  placeholder={
+                    props.value.refresh_token === clearMarker()
+                      ? t("subscription.secret_will_clear")
+                      : refreshTokenConfigured()
+                        ? t("subscription.secret_configured_placeholder")
+                        : undefined
+                  }
+                  onInput={(e) =>
+                    props.onChange("refresh_token", e.currentTarget.value)
+                  }
+                />
+                <Button
+                  size="sm"
+                  variant="outline"
+                  alignSelf="flex-start"
+                  disabled={
+                    !refreshTokenConfigured() && !props.value.refresh_token
+                  }
+                  onClick={() => props.onChange("refresh_token", clearMarker())}
+                >
+                  {t("subscription.secret_clear")}
+                </Button>
+              </VStack>
             </FormField>
             <FormField label={t("subscription.aliyun_drive_id")}>
               <Input

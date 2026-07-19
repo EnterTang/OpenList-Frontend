@@ -41,6 +41,17 @@ const sourceTypeColor: Record<string, "info" | "accent"> = {
   folder: "accent",
 }
 
+const remoteShareIsInvalid = (message?: string) => {
+  const value = message?.trim()
+  if (!value) return false
+  return (
+    /(?:外链|外鏈|分享|链接|連結).*(?:不存在|取消|已取消|失效)/i.test(value) ||
+    /(?:link|share).*(?:not found|not exist|cancelled|canceled|invalid)/i.test(
+      value,
+    )
+  )
+}
+
 export const MobileShareManagement = () => {
   const t = useT()
   const { copy } = useUtil()
@@ -213,95 +224,98 @@ export const MobileShareManagement = () => {
                 </Thead>
                 <Tbody>
                   <For each={records()}>
-                    {(record) => (
-                      <Tr>
-                        <Td maxW="18rem">
-                          <Text css={{ wordBreak: "break-all" }}>
-                            {record.source_name}
-                          </Text>
-                          <Text color="$neutral11" fontSize="$sm">
-                            {record.source_path}
-                          </Text>
-                        </Td>
-                        <Td>
-                          <Badge
-                            colorScheme={sourceTypeColor[record.source_type]}
-                          >
-                            {t(`mobile_share.${record.source_type}`)}
-                          </Badge>
-                        </Td>
-                        <Td maxW="20rem">
-                          <Text css={{ wordBreak: "break-all" }}>
-                            {record.share_url}
-                          </Text>
-                          <Text color="$neutral11" fontSize="$sm">
-                            {record.link_id || "-"}
-                          </Text>
-                        </Td>
-                        <Td>{record.extract_code || "-"}</Td>
-                        <Td>
-                          <VStack spacing="$1" alignItems="start">
+                    {(record) => {
+                      const isValid = () =>
+                        record.is_valid &&
+                        !remoteShareIsInvalid(record.last_error)
+                      return (
+                        <Tr>
+                          <Td maxW="18rem">
+                            <Text css={{ wordBreak: "break-all" }}>
+                              {record.source_name}
+                            </Text>
+                            <Text color="$neutral11" fontSize="$sm">
+                              {record.source_path}
+                            </Text>
+                          </Td>
+                          <Td>
                             <Badge
-                              colorScheme={
-                                record.is_valid ? "success" : "danger"
-                              }
+                              colorScheme={sourceTypeColor[record.source_type]}
                             >
-                              {t(
-                                record.is_valid
-                                  ? "mobile_share.valid"
-                                  : "mobile_share.invalid",
-                              )}
+                              {t(`mobile_share.${record.source_type}`)}
                             </Badge>
-                            <Show when={record.last_error}>
-                              <Text
-                                color="$danger11"
-                                fontSize="$sm"
-                                css={{ wordBreak: "break-all" }}
+                          </Td>
+                          <Td maxW="20rem">
+                            <Text css={{ wordBreak: "break-all" }}>
+                              {record.share_url}
+                            </Text>
+                            <Text color="$neutral11" fontSize="$sm">
+                              {record.link_id || "-"}
+                            </Text>
+                          </Td>
+                          <Td>{record.extract_code || "-"}</Td>
+                          <Td>
+                            <VStack spacing="$1" alignItems="start">
+                              <Badge
+                                colorScheme={isValid() ? "success" : "danger"}
                               >
-                                {record.last_error}
-                              </Text>
-                            </Show>
-                          </VStack>
-                        </Td>
-                        <Td>{record.updated_at}</Td>
-                        <Td>
-                          <HStack spacing="$2">
-                            <Button
-                              size="sm"
-                              onClick={() =>
-                                copy(
-                                  `${record.share_url}${
-                                    record.extract_code
-                                      ? `\n${record.extract_code}`
-                                      : ""
-                                  }`,
-                                )
-                              }
-                            >
-                              {t("mobile_share.copy")}
-                            </Button>
-                            <Button
-                              as="a"
-                              size="sm"
-                              href={record.share_url}
-                              target="_blank"
-                            >
-                              {t("mobile_share.open")}
-                            </Button>
-                            <Show when={record.is_valid}>
+                                {t(
+                                  isValid()
+                                    ? "mobile_share.valid"
+                                    : "mobile_share.invalid",
+                                )}
+                              </Badge>
+                              <Show when={record.last_error}>
+                                <Text
+                                  color="$danger11"
+                                  fontSize="$sm"
+                                  css={{ wordBreak: "break-all" }}
+                                >
+                                  {record.last_error}
+                                </Text>
+                              </Show>
+                            </VStack>
+                          </Td>
+                          <Td>{record.updated_at}</Td>
+                          <Td>
+                            <HStack spacing="$2">
                               <Button
                                 size="sm"
-                                colorScheme="danger"
-                                loading={deleteLoading()}
-                                onClick={() => removeShare(record)}
+                                onClick={() =>
+                                  copy(
+                                    `${record.share_url}${
+                                      record.extract_code
+                                        ? `\n${record.extract_code}`
+                                        : ""
+                                    }`,
+                                  )
+                                }
                               >
-                                {t("mobile_share.delete")}
+                                {t("mobile_share.copy")}
                               </Button>
-                            </Show>
-                          </HStack>
-                        </Td>
-                      </Tr>
-                    )}
+                              <Button
+                                as="a"
+                                size="sm"
+                                href={record.share_url}
+                                target="_blank"
+                              >
+                                {t("mobile_share.open")}
+                              </Button>
+                              <Show when={isValid()}>
+                                <Button
+                                  size="sm"
+                                  colorScheme="danger"
+                                  loading={deleteLoading()}
+                                  onClick={() => removeShare(record)}
+                                >
+                                  {t("mobile_share.delete")}
+                                </Button>
+                              </Show>
+                            </HStack>
+                          </Td>
+                        </Tr>
+                      )
+                    }}
                   </For>
                 </Tbody>
               </Table>

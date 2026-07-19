@@ -30,7 +30,7 @@ export const Layout = () => {
         _hover={{
           bgColor: changeColor(getMainColor(), { alpha: 0.2 }),
         }}
-        aria-label="switch layout"
+        aria-label={t("home.layouts.switch")}
         compact
         size="lg"
         icon={
@@ -52,6 +52,8 @@ export const Layout = () => {
           {(item) => (
             <MenuItem
               icon={<Dynamic component={item[1]} />}
+              role="menuitemradio"
+              aria-checked={layout() === item[0]}
               onSelect={() => {
                 setLayout(item[0] as LayoutType)
               }}

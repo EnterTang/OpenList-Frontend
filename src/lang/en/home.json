@@ -55,6 +55,7 @@
     }
   },
   "layouts": {
+    "switch": "Switch file layout",
     "list": "List View",
     "grid": "Grid View",
     "image": "Image View"
@@ -62,6 +63,7 @@
   "sidebar": {
     "title": "OpenList",
     "collapse": "Collapse sidebar",
+    "expand": "Expand sidebar",
     "netdisk": "Drive management",
     "subscriptions": "Subscription management",
     "mobile_share": "Mobile share management",

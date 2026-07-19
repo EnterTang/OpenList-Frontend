@@ -1,5 +1,6 @@
 import {
   Box,
+  Badge,
   Button,
   Checkbox,
   Drawer,
@@ -40,7 +41,13 @@ import {
   Show,
 } from "solid-js"
 import { useFetch, useListFetch, useManageTitle, useT } from "~/hooks"
-import { ClusterJob, ClusterJobStatus, ClusterUploadManifest } from "~/types"
+import {
+  ClusterJob,
+  ClusterJobStage,
+  ClusterJobStageStatus,
+  ClusterJobStatus,
+  ClusterUploadManifest,
+} from "~/types"
 import {
   clusterClearFailedJobs,
   clusterListJobs,
@@ -86,6 +93,29 @@ const statuses: ClusterJobStatus[] = [
   "cancelled",
   "dead_letter",
 ]
+
+const stageStatusColor: Record<
+  ClusterJobStageStatus,
+  "neutral" | "info" | "success" | "warning" | "danger"
+> = {
+  pending: "neutral",
+  permitted: "info",
+  running: "info",
+  succeeded: "success",
+  failed: "danger",
+  skipped: "neutral",
+  unknown: "warning",
+}
+
+const latestStage = (job: ClusterJob): ClusterJobStage | undefined => {
+  const stages = job.stages || []
+  return stages.reduce<ClusterJobStage | undefined>((latest, stage) => {
+    if (!latest) return stage
+    const latestTime = Date.parse(latest.updated_at || latest.created_at)
+    const stageTime = Date.parse(stage.updated_at || stage.created_at)
+    return stageTime >= latestTime ? stage : latest
+  }, undefined)
+}
 
 const ClusterPageTitle = () => {
   useManageTitle("cluster.jobs.title")
@@ -220,6 +250,23 @@ const Jobs = (props: { embedded?: boolean } = {}) => {
     </Box>
   )
 
+  const StageSummary = (props: { job: ClusterJob }) => (
+    <Show
+      when={latestStage(props.job)}
+      keyed
+      fallback={<Text color="$neutral11">-</Text>}
+    >
+      {(stage) => (
+        <VStack alignItems="flex-start" spacing="$1">
+          <Text size="xs">{t(`cluster.stage.${stage.name}`)}</Text>
+          <Badge colorScheme={stageStatusColor[stage.status]}>
+            {t(`cluster.stage_status.${stage.status}`)}
+          </Badge>
+        </VStack>
+      )}
+    </Show>
+  )
+
   return (
     <VStack w="$full" alignItems="stretch" spacing="$4" pb="$6">
       <Show when={!props.embedded}>
@@ -335,7 +382,10 @@ const Jobs = (props: { embedded?: boolean } = {}) => {
       </HStack>
 
       <Panel>
-        <Show when={!loading()} fallback={<LoadingBlock />}>
+        <Show
+          when={!loading() || jobs().length > 0}
+          fallback={<LoadingBlock />}
+        >
           <Show
             when={visibleJobs().length > 0}
             fallback={
@@ -345,8 +395,11 @@ const Jobs = (props: { embedded?: boolean } = {}) => {
               />
             }
           >
-            <Box overflowX="auto">
-              <Table minW="72rem" dense>
+            <Box
+              display={{ "@initial": "none", "@lg": "block" }}
+              overflowX="auto"
+            >
+              <Table minW="78rem" dense>
                 <Thead>
                   <Tr>
                     <Th>{t("cluster.fields.job")}</Th>
@@ -355,6 +408,7 @@ const Jobs = (props: { embedded?: boolean } = {}) => {
                     <Th>{t("cluster.fields.worker")}</Th>
                     <Th>{t("cluster.fields.size")}</Th>
                     <Th>{t("cluster.fields.status")}</Th>
+                    <Th>{t("cluster.fields.stage")}</Th>
                     <Th>{t("cluster.fields.updated_at")}</Th>
                     <Th textAlign="right">{t("cluster.fields.actions")}</Th>
                   </Tr>
@@ -402,6 +456,9 @@ const Jobs = (props: { embedded?: boolean } = {}) => {
                         <Td>
                           <JobStatusBadge status={job.status} />
                         </Td>
+                        <Td>
+                          <StageSummary job={job} />
+                        </Td>
                         <Td css={{ whiteSpace: "nowrap" }}>
                           {formatDate(job.updated_at)}
                         </Td>
@@ -435,12 +492,110 @@ const Jobs = (props: { embedded?: boolean } = {}) => {
                 </Tbody>
               </Table>
             </Box>
+
+            <VStack
+              display={{ "@initial": "flex", "@lg": "none" }}
+              alignItems="stretch"
+              spacing="$0"
+            >
+              <For each={visibleJobs()}>
+                {({ job, depth }) => (
+                  <Box
+                    px="$4"
+                    py="$4"
+                    pl={depth ? "$7" : "$4"}
+                    borderBottomWidth="1px"
+                    borderColor="$neutral5"
+                  >
+                    <HStack
+                      justifyContent="space-between"
+                      alignItems="flex-start"
+                      spacing="$3"
+                      mb="$3"
+                    >
+                      <Box minW="0">
+                        <HStack spacing="$1">
+                          <Show when={depth}>
+                            <Text color="$neutral9">↳</Text>
+                          </Show>
+                          <Text fontFamily="$mono" size="sm" title={job.id}>
+                            {shortID(job.id)}
+                          </Text>
+                        </HStack>
+                        <Show when={job.expected_items > 0}>
+                          <Text size="xs" color="$neutral11">
+                            {t("cluster.jobs.child_count", {
+                              count: job.expected_items,
+                            })}
+                          </Text>
+                        </Show>
+                      </Box>
+                      <JobStatusBadge status={job.status} />
+                    </HStack>
+
+                    <SimpleGrid columns={2} gap="$3" mb="$3">
+                      <DetailField
+                        labelKey="cluster.fields.type"
+                        value={t(`cluster.job_type.${job.type}`)}
+                      />
+                      <DetailField
+                        labelKey="cluster.fields.media"
+                        value={job.media_item_id || "-"}
+                      />
+                      <DetailField
+                        labelKey="cluster.fields.worker"
+                        value={shortID(job.assigned_node_id)}
+                        mono
+                      />
+                      <DetailField
+                        labelKey="cluster.fields.size"
+                        value={formatBytes(job.expected_bytes)}
+                      />
+                      <Box minW="0">
+                        <Text size="xs" color="$neutral11" mb="$1">
+                          {t("cluster.fields.stage")}
+                        </Text>
+                        <StageSummary job={job} />
+                      </Box>
+                      <DetailField
+                        labelKey="cluster.fields.updated_at"
+                        value={formatDate(job.updated_at)}
+                      />
+                    </SimpleGrid>
+
+                    <HStack spacing="$2" flexWrap="wrap">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => openDetails(job)}
+                      >
+                        {t("cluster.actions.view_details")}
+                      </Button>
+                      <Show when={retryableJobStatuses.includes(job.status)}>
+                        <Button
+                          size="sm"
+                          colorScheme="info"
+                          variant="outline"
+                          loading={retryingID() === job.id}
+                          onClick={() => retry(job)}
+                        >
+                          {t("cluster.actions.retry_job")}
+                        </Button>
+                      </Show>
+                    </HStack>
+                  </Box>
+                )}
+              </For>
+            </VStack>
           </Show>
         </Show>
       </Panel>
 
       <Panel titleKey="cluster.results.title">
-        <Show when={!resultsLoading()} fallback={<LoadingBlock />}>
+        <Show
+          when={!resultsLoading() || results().length > 0}
+          fallback={<LoadingBlock />}
+        >
           <Show
             when={results().length > 0}
             fallback={
@@ -586,6 +741,56 @@ const Jobs = (props: { embedded?: boolean } = {}) => {
                       )}
                     />
                   </SimpleGrid>
+
+                  <Show when={(job.stages || []).length > 0}>
+                    <Panel titleKey="cluster.job_details.stages">
+                      <VStack alignItems="stretch" spacing="$0">
+                        <For each={job.stages || []}>
+                          {(stage) => (
+                            <Box
+                              px="$4"
+                              py="$3"
+                              borderBottomWidth="1px"
+                              borderColor="$neutral5"
+                            >
+                              <HStack
+                                justifyContent="space-between"
+                                alignItems="flex-start"
+                                spacing="$3"
+                              >
+                                <Box minW="0">
+                                  <Text fontWeight="$medium">
+                                    {t(`cluster.stage.${stage.name}`)}
+                                  </Text>
+                                  <Text size="xs" color="$neutral11">
+                                    {formatDate(stage.updated_at)}
+                                    {stage.retry_count > 0
+                                      ? ` · ${t("cluster.fields.retries")}: ${stage.retry_count}`
+                                      : ""}
+                                  </Text>
+                                </Box>
+                                <Badge
+                                  colorScheme={stageStatusColor[stage.status]}
+                                >
+                                  {t(`cluster.stage_status.${stage.status}`)}
+                                </Badge>
+                              </HStack>
+                              <Show when={stage.error || stage.error_code}>
+                                <Text
+                                  mt="$2"
+                                  size="xs"
+                                  color="$danger11"
+                                  css={{ overflowWrap: "anywhere" }}
+                                >
+                                  {stage.error_code || stage.error}
+                                </Text>
+                              </Show>
+                            </Box>
+                          )}
+                        </For>
+                      </VStack>
+                    </Panel>
+                  </Show>
 
                   <Show when={job.last_error || job.last_error_code}>
                     <Box bg="$danger2" borderRadius="$md" p="$4">

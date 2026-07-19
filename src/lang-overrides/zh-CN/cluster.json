@@ -17,6 +17,7 @@
     "drain_node": "排空 Worker",
     "disable_node": "禁用 Worker",
     "revoke_node": "吊销 Worker",
+    "remove_node": "永久移除 Worker",
     "retry_job": "重试任务",
     "view_details": "查看详情",
     "bring_online": "启用 Worker",
@@ -157,6 +158,7 @@
     "media_type": "媒体类型",
     "node": "Worker",
     "notification_status": "通知状态",
+    "retries": "重试次数",
     "parent_job": "父任务",
     "received_at": "接收时间",
     "role": "角色",
@@ -167,6 +169,7 @@
     "size": "大小",
     "source_message": "来源消息",
     "source_objects": "来源文件",
+    "stage": "当前阶段",
     "started_at": "开始时间",
     "status": "状态",
     "subscription": "订阅",
@@ -194,16 +197,21 @@
   },
   "confirm": {
     "clear_failed_jobs": "确定清除任务看板内的全部失败任务？任务仍会保留在归档记录中。",
-    "revoke_node": "确定吊销此 Worker？重新注册后才能再次连接。"
+    "disable_node": "确定禁用此 Worker？系统将停止分配新任务，并关闭当前连接。",
+    "drain_node": "确定排空此 Worker？系统将停止分配新任务，并等待当前任务执行完成。",
+    "revoke_node": "确定吊销此 Worker？重新注册后才能再次连接。",
+    "remove_node": "确定永久移除此 Worker？节点身份、会话、挂载清单和下发配置将被删除；历史任务和上传结果会保留。若该 Worker 仍在运行，它可能会重新注册。"
   },
   "notifications": {
     "failed_jobs_cleared": "已归档 {{count}} 个失败任务",
     "inventory_requested": "已发送挂载查询请求",
     "job_requeued": "任务已进入重试队列",
-    "node_state_updated": "Worker 状态已更新"
+    "node_state_updated": "Worker 状态已更新",
+    "node_removed": "Worker 已永久移除"
   },
   "job_details": {
     "title": "任务详情",
+    "stages": "执行阶段",
     "error": "执行错误",
     "task_context": "任务上下文",
     "invalid_context": "保存的任务上下文不是有效的 JSON。"
@@ -354,6 +362,7 @@
     "consumed": "已消费"
   },
   "notification_status": {
+    "not_started": "未进入通知",
     "pending": "待通知",
     "sending": "通知中",
     "succeeded": "通知成功",
@@ -366,6 +375,28 @@
     "running": "清理中",
     "succeeded": "清理成功",
     "failed": "清理失败"
+  },
+  "stage_status": {
+    "pending": "待执行",
+    "permitted": "已许可",
+    "running": "执行中",
+    "succeeded": "已完成",
+    "failed": "失败",
+    "skipped": "已跳过",
+    "unknown": "未知"
+  },
+  "stage": {
+    "saving_share": "转存分享",
+    "discovering_files": "发现文件",
+    "downloading": "下载中",
+    "source_cleanup": "清理来源文件",
+    "uploading_mobile": "上传到目标网盘",
+    "result_persisting": "保存上传结果",
+    "worker_media_cleanup": "清理 Worker 媒体",
+    "result_reporting": "上报结果",
+    "etf_materializing": "生成 ETF 信息",
+    "etf_archiving": "归档 ETF 信息",
+    "target_notifying": "通知目标服务"
   },
   "media_type": {
     "tv": "剧集",

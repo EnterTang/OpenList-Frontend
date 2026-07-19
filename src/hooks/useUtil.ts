@@ -10,8 +10,13 @@ export const useUtil = () => {
   const { pathname } = useRouter()
   return {
     copy: (text: string) => {
-      copy(text)
-      notify.success(t("global.copied"))
+      const copied = copy(text)
+      if (copied) {
+        notify.success(t("global.copied"))
+      } else {
+        notify.error(t("global.copy_failed"))
+      }
+      return copied
     },
     isHide: (obj: Obj) => {
       const hideFiles = getHideFiles()

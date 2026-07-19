@@ -32,6 +32,24 @@ function fixLegacyPolyfillDataSrc(): Plugin {
   }
 }
 
+// Some package-manager versions can install vite-plugin-dynamic-base without
+// applying its local patch. In that case Vite emits `/${dynamicBase}/assets`,
+// which becomes the protocol-relative `//assets` when the app has no CDN.
+function fixDynamicBaseAssetPrefixes(): Plugin {
+  const brokenPrefix = /`\/(\$\{\s*window\.__dynamic_base__\s*\}\/)/g
+  return {
+    name: "fix-dynamic-base-asset-prefixes",
+    enforce: "post",
+    apply: "build",
+    generateBundle(_, bundle) {
+      for (const chunk of Object.values(bundle)) {
+        if (chunk.type !== "chunk") continue
+        chunk.code = chunk.code.replace(brokenPrefix, "`$1")
+      }
+    },
+  }
+}
+
 export default defineConfig({
   resolve: {
     alias: {
@@ -89,6 +107,7 @@ export default defineConfig({
         })
       : null,
     fixLegacyPolyfillDataSrc(),
+    fixDynamicBaseAssetPrefixes(),
   ],
   base: process.env.NODE_ENV === "production" ? "/__dynamic_base__/" : "/",
   // base: "/",

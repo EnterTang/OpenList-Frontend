@@ -17,6 +17,7 @@
     "drain_node": "Drain worker",
     "disable_node": "Disable worker",
     "revoke_node": "Revoke worker",
+    "remove_node": "Remove worker permanently",
     "retry_job": "Retry task",
     "view_details": "View details",
     "bring_online": "Enable worker",
@@ -157,6 +158,7 @@
     "media_type": "Media type",
     "node": "Worker",
     "notification_status": "Notification",
+    "retries": "Retries",
     "parent_job": "Parent task",
     "received_at": "Received",
     "role": "Role",
@@ -167,6 +169,7 @@
     "size": "Size",
     "source_message": "Source message",
     "source_objects": "Source objects",
+    "stage": "Current stage",
     "started_at": "Started",
     "status": "Status",
     "subscription": "Subscription",
@@ -194,16 +197,21 @@
   },
   "confirm": {
     "clear_failed_jobs": "Clear all failed tasks from the active board? They remain archived for audit.",
-    "revoke_node": "Revoke this Worker? It must be enrolled again before it can reconnect."
+    "disable_node": "Disable this Worker? New tasks will not be assigned and its current connection will close.",
+    "drain_node": "Drain this Worker? New tasks will stop being assigned while its active tasks finish.",
+    "revoke_node": "Revoke this Worker? It must be enrolled again before it can reconnect.",
+    "remove_node": "Remove this Worker permanently? Its identity, sessions, mount inventory, and desired configuration will be deleted. Historical tasks and upload results will remain. If the Worker is still running, it may enroll again."
   },
   "notifications": {
     "failed_jobs_cleared": "Archived {{count}} failed tasks",
     "inventory_requested": "Mount inventory query sent",
     "job_requeued": "Task queued for retry",
-    "node_state_updated": "Worker state updated"
+    "node_state_updated": "Worker state updated",
+    "node_removed": "Worker removed permanently"
   },
   "job_details": {
     "title": "Task details",
+    "stages": "Execution stages",
     "error": "Execution error",
     "task_context": "Task context",
     "invalid_context": "The stored task context is not valid JSON."
@@ -354,6 +362,7 @@
     "consumed": "Consumed"
   },
   "notification_status": {
+    "not_started": "Not started",
     "pending": "Pending",
     "sending": "Sending",
     "succeeded": "Succeeded",
@@ -366,6 +375,28 @@
     "running": "Running",
     "succeeded": "Succeeded",
     "failed": "Failed"
+  },
+  "stage_status": {
+    "pending": "Pending",
+    "permitted": "Permitted",
+    "running": "Running",
+    "succeeded": "Succeeded",
+    "failed": "Failed",
+    "skipped": "Skipped",
+    "unknown": "Unknown"
+  },
+  "stage": {
+    "saving_share": "Saving share",
+    "discovering_files": "Discovering files",
+    "downloading": "Downloading",
+    "source_cleanup": "Cleaning source",
+    "uploading_mobile": "Uploading to target",
+    "result_persisting": "Saving upload result",
+    "worker_media_cleanup": "Cleaning Worker media",
+    "result_reporting": "Reporting result",
+    "etf_materializing": "Materializing ETF",
+    "etf_archiving": "Archiving ETF",
+    "target_notifying": "Notifying target"
   },
   "media_type": {
     "tv": "TV",

@@ -29,6 +29,7 @@ import {
   ClusterProviderAccountInventory,
 } from "~/types"
 import {
+  clusterDeleteNode,
   clusterListNodes,
   clusterQueryNodeInventory,
   clusterSetNodeState,
@@ -93,6 +94,7 @@ const Nodes = (props: { embedded?: boolean } = {}) => {
     (nodeID: string, state: ClusterNodeMutableState) =>
       clusterSetNodeState(nodeID, state),
   )
+  const [deletingID, deleteNode] = useListFetch(clusterDeleteNode)
 
   const refresh = async () => {
     const resp = await loadNodes()
@@ -116,15 +118,28 @@ const Nodes = (props: { embedded?: boolean } = {}) => {
     node: ClusterNode,
     state: ClusterNodeMutableState,
   ) => {
-    if (
-      state === "revoked" &&
-      !window.confirm(t("cluster.confirm.revoke_node"))
-    )
-      return
+    const confirmation =
+      state === "draining"
+        ? t("cluster.confirm.drain_node")
+        : state === "disabled"
+          ? t("cluster.confirm.disable_node")
+          : state === "revoked"
+            ? t("cluster.confirm.revoke_node")
+            : ""
+    if (confirmation && !window.confirm(confirmation)) return
     const resp = await changeState(node.id, state)
     handleResp(resp, () => {
       notify.success(t("cluster.notifications.node_state_updated"))
       void refresh()
+    })
+  }
+
+  const removeNode = async (node: ClusterNode) => {
+    if (!window.confirm(t("cluster.confirm.remove_node"))) return
+    const resp = await deleteNode(node.id)
+    handleResp(resp, () => {
+      setNodes((current) => current.filter((item) => item.id !== node.id))
+      notify.success(t("cluster.notifications.node_removed"))
     })
   }
 
@@ -324,6 +339,20 @@ const Nodes = (props: { embedded?: boolean } = {}) => {
           onClick={() => setState(props.node, "revoked")}
         >
           {t("cluster.actions.revoke_node")}
+        </Button>
+      </Show>
+      <Show
+        when={
+          props.node.status !== "online" && props.node.status !== "draining"
+        }
+      >
+        <Button
+          size="sm"
+          colorScheme="danger"
+          loading={deletingID() === props.node.id}
+          onClick={() => removeNode(props.node)}
+        >
+          {t("cluster.actions.remove_node")}
         </Button>
       </Show>
     </HStack>

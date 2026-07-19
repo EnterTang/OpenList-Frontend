@@ -24,7 +24,7 @@ import { LoadingBlock } from "../manage/cluster/components"
 
 const Overview = lazy(() => import("../manage/cluster/Overview"))
 const Nodes = lazy(() => import("../manage/cluster/Nodes"))
-const TransferTasks = lazy(() => import("../manage/subscription/TransferTasks"))
+const Jobs = lazy(() => import("../manage/cluster/Jobs"))
 const Settings = lazy(() => import("../manage/cluster/Settings"))
 
 type ClusterControlTab = "overview" | "nodes" | "tasks" | "settings"
@@ -187,7 +187,7 @@ export const ClusterControl = () => {
                 <Nodes embedded />
               </Match>
               <Match when={activeTab() === "tasks"}>
-                <TransferTasks embedded />
+                <Jobs embedded />
               </Match>
               <Match when={activeTab() === "settings"}>
                 <Settings embedded />

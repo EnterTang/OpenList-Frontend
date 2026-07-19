@@ -77,6 +77,35 @@ export type ClusterJobStatus =
   | "cancelled"
   | "dead_letter"
 
+export type ClusterJobStageStatus =
+  | "pending"
+  | "permitted"
+  | "running"
+  | "succeeded"
+  | "failed"
+  | "skipped"
+  | "unknown"
+
+export interface ClusterJobStage {
+  id: string
+  created_at: string
+  updated_at: string
+  job_id: string
+  attempt_id: string
+  name: string
+  status: ClusterJobStageStatus
+  operation_key: string
+  permit_token_hash: string
+  permit_expires_at?: string | null
+  checkpoint_json: string
+  progress_json: string
+  retry_count: number
+  started_at?: string | null
+  finished_at?: string | null
+  error_code: string
+  error: string
+}
+
 export type ClusterNotificationStatus =
   | "pending"
   | "sending"
@@ -291,6 +320,7 @@ export interface ClusterJob {
   archived_at?: string | null
   last_error_code: string
   last_error: string
+  stages?: ClusterJobStage[]
 }
 
 export interface ClusterUploadManifest {

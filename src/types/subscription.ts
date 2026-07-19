@@ -13,6 +13,27 @@ export interface SubscriptionProgress {
   last_episode_added_at?: string
 }
 
+export type SubscriptionRealtimeDeliveryStatus =
+  | "idle"
+  | "inspecting"
+  | "transferring"
+  | "notifying"
+  | "succeeded"
+  | "failed"
+
+export interface SubscriptionRealtimeStatus {
+  enabled: boolean
+  listener_state: string
+  delivery_status: SubscriptionRealtimeDeliveryStatus
+  active_job_count: number
+  last_event_at?: string
+  last_completed_at?: string
+  last_message_channel?: string
+  last_message_id?: string
+  last_error?: string
+  retry_at?: string
+}
+
 export type SubscriptionStorageProvider =
   | "pan123"
   | "pan115"
@@ -54,6 +75,7 @@ export interface Subscription {
   last_status: SubscriptionStatus
   last_error: string
   progress?: SubscriptionProgress
+  realtime_status?: SubscriptionRealtimeStatus
 }
 
 export interface SubscriptionItem {
@@ -132,6 +154,22 @@ export interface SubscriptionEpisodeSource {
   selected_at: string
   status: string
   worker_name: string
+  item_last_error?: string
+  job_status?: string
+  job_notification_status?: string
+  job_generation?: number
+  job_started_at?: string
+  job_finished_at?: string
+  job_last_error_code?: string
+  job_last_error?: string
+  current_stage?: string
+  current_stage_status?: string
+  current_stage_retry_count?: number
+  current_stage_error_code?: string
+  current_stage_error?: string
+  effective_status?: string
+  notification_display_status?: string
+  has_archived_etf?: boolean
 }
 
 export interface SubscriptionRunResult {
@@ -161,6 +199,21 @@ export interface SubscriptionResourceSearchResp {
   sources: SubscriptionSourceType[]
   results: SubscriptionResourceSearchResult[]
   source_errors?: Partial<Record<SubscriptionSourceType, string>>
+  source_capabilities?: Partial<
+    Record<SubscriptionSourceType, SubscriptionSearchSourceCapability>
+  >
+}
+
+export interface SubscriptionSearchSourceCapability {
+  configured: boolean
+  available: boolean
+  unavailable_reason?: string
+}
+
+export interface SubscriptionConfigSecretStatus {
+  configured: Record<string, boolean>
+  unchanged_marker: string
+  clear_marker: string
 }
 
 export interface SubscriptionTelegramSourceConfig {
@@ -181,6 +234,10 @@ export interface SubscriptionTelegramSourceConfig {
   command_env: string[]
   command_timeout_seconds: number
   limit: number
+  realtime_enabled?: boolean
+  realtime_groups?: string[]
+  realtime_candidate_wait_seconds?: number
+  realtime_expected_providers?: string[]
 }
 
 export interface SubscriptionTelegramPanConfig {
@@ -229,4 +286,11 @@ export interface SubscriptionConfig {
   default_category?: string
   telegram: SubscriptionTelegramSourceConfig
   pansou: SubscriptionPanSouSourceConfig
+}
+
+export interface SubscriptionConfigResponse extends SubscriptionConfig {
+  secret_status?: SubscriptionConfigSecretStatus
+  source_capabilities?: Partial<
+    Record<SubscriptionSourceType, SubscriptionSearchSourceCapability>
+  >
 }

@@ -99,7 +99,23 @@ export const parseTaskContext = (
 ): ClusterTaskContext | undefined => {
   if (!job?.task_context_json) return undefined
   try {
-    return JSON.parse(job.task_context_json) as ClusterTaskContext
+    const value = JSON.parse(
+      job.task_context_json,
+    ) as Partial<ClusterTaskContext>
+    if (
+      !value ||
+      typeof value !== "object" ||
+      !value.subscription ||
+      typeof value.subscription !== "object" ||
+      !value.share ||
+      typeof value.share !== "object" ||
+      !value.media ||
+      typeof value.media !== "object" ||
+      !Array.isArray(value.source_objects)
+    ) {
+      return undefined
+    }
+    return value as ClusterTaskContext
   } catch (_) {
     return undefined
   }
