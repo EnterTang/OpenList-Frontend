@@ -37,6 +37,7 @@ import {
   useColorModeValue,
 } from "@hope-ui/solid"
 import {
+  AiOutlineCopy,
   AiOutlineDelete,
   AiOutlineEdit,
   AiOutlineLogin,
@@ -61,7 +62,7 @@ import {
   Switch,
 } from "solid-js"
 import { Paginator } from "~/components"
-import { useFetch, useT } from "~/hooks"
+import { useFetch, useT, useUtil } from "~/hooks"
 import {
   Subscription,
   SubscriptionArchiveStatus,
@@ -2420,6 +2421,47 @@ const SubscriptionList = (props: {
   )
 }
 
+const SubscriptionErrorCell = (props: { error?: string }) => {
+  const t = useT()
+  const { copy } = useUtil()
+  const error = props.error?.trim()
+
+  if (!error) {
+    return <Text>-</Text>
+  }
+
+  return (
+    <HStack alignItems="center" spacing="$1" gap="$1" minH="3.5rem">
+      <Text
+        color="$danger11"
+        fontSize="$xs"
+        flex="1"
+        css={{
+          wordBreak: "break-word",
+          display: "-webkit-box",
+          WebkitBoxOrient: "vertical",
+          WebkitLineClamp: 2,
+          overflow: "hidden",
+        }}
+      >
+        {error}
+      </Text>
+      <Button
+        size="xs"
+        variant="ghost"
+        aria-label={t("subscription.detail_copy_error")}
+        title={t("subscription.detail_copy_error")}
+        onClick={(event) => {
+          event.stopPropagation()
+          copy(error)
+        }}
+      >
+        <AiOutlineCopy />
+      </Button>
+    </HStack>
+  )
+}
+
 const SubscriptionEpisodeSourcesModal = (props: {
   opened: boolean
   record?: Subscription
@@ -2724,16 +2766,13 @@ const SubscriptionEpisodeSourcesModal = (props: {
                                 </Show>
                               </Td>
                               <Td maxW="18rem">
-                                <Text
-                                  color="$danger11"
-                                  fontSize="$xs"
-                                  css={{ wordBreak: "break-word" }}
-                                >
-                                  {item.current_stage_error ||
+                                <SubscriptionErrorCell
+                                  error={
+                                    item.current_stage_error ||
                                     item.job_last_error ||
-                                    item.item_last_error ||
-                                    "-"}
-                                </Text>
+                                    item.item_last_error
+                                  }
+                                />
                               </Td>
                               <Td>{formatTimestampLabel(item.selected_at)}</Td>
                             </Tr>

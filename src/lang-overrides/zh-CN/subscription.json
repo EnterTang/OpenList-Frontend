@@ -230,6 +230,7 @@
   "detail_stage": "当前阶段",
   "detail_notification": "通知状态",
   "detail_error": "最近错误",
+  "detail_copy_error": "复制错误详情",
   "detail_retry_count": "已重试 {{count}} 次",
   "detail_selected_at": "选择时间",
   "run_subscription": "订阅",

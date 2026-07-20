@@ -238,6 +238,7 @@
   "detail_stage": "Current stage",
   "detail_notification": "Notification",
   "detail_error": "Latest error",
+  "detail_copy_error": "Copy error details",
   "detail_retry_count": "Retried {{count}} times",
   "detail_selected_at": "Selected at"
 }

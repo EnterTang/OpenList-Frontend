@@ -116,6 +116,7 @@
   "detail_stage": "目前階段",
   "detail_notification": "通知狀態",
   "detail_error": "最近錯誤",
+  "detail_copy_error": "複製錯誤詳情",
   "detail_retry_count": "已重試 {{count}} 次",
   "detail_selected_at": "選擇時間",
   "realtime_status": "Telegram 即時監聽",
