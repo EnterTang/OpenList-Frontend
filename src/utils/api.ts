@@ -440,6 +440,12 @@ export const subscriptionCheck = (
   return r.post("/admin/subscription/check", { id, transfer })
 }
 
+export const subscriptionRetryFailed = (
+  id: number,
+): PResp<SubscriptionRunResult> => {
+  return r.post("/admin/subscription/retry_failed", { id, transfer: true })
+}
+
 export const subscriptionRuns = (
   params: SubscriptionRunQuery = {},
 ): PPageResp<SubscriptionRun> => {

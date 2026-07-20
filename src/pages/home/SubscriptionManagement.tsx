@@ -82,6 +82,7 @@ import {
   handleResp,
   notify,
   subscriptionCheck,
+  subscriptionRetryFailed,
   subscriptionConfigGet,
   subscriptionConfigSave,
   subscriptionCreate,
@@ -582,6 +583,7 @@ export const SubscriptionManagement = () => {
   const [createLoading, createSub] = useFetch(subscriptionCreate)
   const [updateLoading, updateSub] = useFetch(subscriptionUpdate)
   const [deleteLoading, deleteSub] = useFetch(subscriptionDelete)
+  const [retryFailedLoading, retryFailed] = useFetch(subscriptionRetryFailed)
   const [checkingKeys, setCheckingKeys] = createSignal<string[]>([])
   const [tmdbSearchLoading, searchTMDB] = useFetch(etfArchiveTMDBSearch)
   const [configLoading, loadConfig] = useFetch(subscriptionConfigGet)
@@ -924,6 +926,17 @@ export const SubscriptionManagement = () => {
     handleResp(resp, () => {
       notify.success(t("global.delete_success"))
       refresh()
+    })
+  }
+
+  const retryFailedItems = async () => {
+    const record = detailSubscription()
+    if (!record || retryFailedLoading()) return
+    const resp = await retryFailed(record.id)
+    handleResp(resp, () => {
+      notify.success(t("tasks.retry_failed"))
+      refresh()
+      void openSubscriptionDetails(record)
     })
   }
 
@@ -1375,14 +1388,10 @@ export const SubscriptionManagement = () => {
                                       checked={selectedSeasons().includes(
                                         season,
                                       )}
-                                      disabled={
-                                        selectedSeasons().includes(season) &&
-                                        selectedSeasons().length === 1
-                                      }
-                                      onChange={(e) =>
+                                      onChange={() =>
                                         toggleSeason(
                                           season,
-                                          e.currentTarget.checked,
+                                          !selectedSeasons().includes(season),
                                         )
                                       }
                                     >
@@ -1954,6 +1963,8 @@ export const SubscriptionManagement = () => {
               loading={episodeSourcesLoadingID() === detailSubscription()?.id}
               sources={episodeSourceRecords()}
               error={episodeSourcesError()}
+              retryFailedLoading={retryFailedLoading()}
+              onRetryFailed={retryFailedItems}
               onClose={closeSubscriptionDetails}
             />
           </VStack>
@@ -2415,6 +2426,8 @@ const SubscriptionEpisodeSourcesModal = (props: {
   loading: boolean
   sources: SubscriptionEpisodeSource[]
   error: string
+  retryFailedLoading: boolean | undefined
+  onRetryFailed: () => Promise<void>
   onClose: () => void
 }) => {
   const t = useT()
@@ -2450,6 +2463,12 @@ const SubscriptionEpisodeSourcesModal = (props: {
     return item.episode > 0 ? `E${String(item.episode).padStart(2, "0")}` : "-"
   }
 
+  const hasFailedItems = createMemo(() =>
+    props.sources.some(
+      (item) => (item.effective_status || item.status) === "failed",
+    ),
+  )
+
   const statusLabel = (status?: string) => {
     if (!status) return "-"
     switch (status) {
@@ -2481,9 +2500,24 @@ const SubscriptionEpisodeSourcesModal = (props: {
       <ModalContent w="calc(100vw - 1.5rem)" maxW="72rem">
         <ModalCloseButton />
         <ModalHeader css={{ overflowWrap: "break-word" }}>
-          {t("subscription.detail_title", {
-            name: props.record?.name || "-",
-          })}
+          <HStack justifyContent="space-between" gap="$2" pr="$8">
+            <Text css={{ wordBreak: "break-word" }}>
+              {t("subscription.detail_title", {
+                name: props.record?.name || "-",
+              })}
+            </Text>
+            <Show when={hasFailedItems()}>
+              <Button
+                size="sm"
+                colorScheme="warning"
+                leftIcon={<AiOutlineReload />}
+                loading={props.retryFailedLoading}
+                onClick={() => void props.onRetryFailed()}
+              >
+                {t("tasks.retry_failed")}
+              </Button>
+            </Show>
+          </HStack>
         </ModalHeader>
         <ModalBody>
           <VStack spacing="$4" alignItems="stretch">
